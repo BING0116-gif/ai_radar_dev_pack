@@ -72,3 +72,13 @@
 - 失败统一结构化：provider 请求/解析失败抛 `ProviderError`/`FetchURLError`，由 Registry 转 `ToolResult(success=False)`，404/超时/超大页面均不崩溃。
 - httpx 升级为运行时依赖；live 冒烟：Google News 返回 3 条、HN 返回 3 条真实数据。
 - 测试：`tests/test_news_tools.py` 11 个用例（RSS/JSON 解析、provider 回退、全失败、未知 provider、HTML 提取、非 http scheme、404/超时/超大 page）。
+
+### CARD-009 — Core Agent Loop
+
+- 新增 `app/core/llm_client.py`：`LLMResponse/ToolCall` 类型 + OpenAI 兼容 `/chat/completions` 客户端（`OpenAICompatibleClient`），参数 JSON 反序列化容错；配置缺失/HTTP 错误结构化抛出（`LLMConfigurationError`/`LLMRequestError`）。
+- 新增 `app/agent/context.py`（`AgentContext`）与 `app/agent/loop.py`（`AgentLoop`）。
+- **模型驱动循环**：每轮 `messages + schemas → LLM` → 解析 0..N tool_calls → Registry 执行 → observation（`{ok,data,error}`，带 `tool_call_id`）回填 → 模型再次决策；循环对工具顺序零预判，严禁固定 Pipeline。
+- 停止条件：final（无 tool_calls）| `AGENT_MAX_STEPS`（默认 12）| 连续相同 tool+args 超阈值（默认 3 次，防死循环）| 外部 `should_stop` 取消。
+- 每次调用记录 `ToolCallRecord`（name/args/success/output_preview，供 CARD-011 落 trace）。
+- 真实冒烟：DeepSeek 端到端运行 —— 模型自主连调两次 `web_search` 后给出最终答案（工具顺序由模型决定，非固定流程）。
+- 测试：`test_agent_loop.py` 7 个用例（两次 tool call→final、单轮多 tool_calls 回填、工具失败继续、max_steps、重复保护、不同调用不误触、取消）+ `test_llm_client.py` 4 个用例（解析/容错/配置缺失/401）。
