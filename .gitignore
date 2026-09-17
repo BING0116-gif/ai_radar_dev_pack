@@ -23,6 +23,12 @@ frontend/dist/
 workspace/cache/
 *.log
 
+# --- Databases ---
+*.db
+*.db-journal
+*.sqlite3
+*.sqlite
+
 # --- IDE / OS ---
 .idea/
 .vscode/

@@ -21,3 +21,12 @@
 - `main.py` 启动时初始化 Settings 与日志，记录启动 JSON 日志且不泄漏密钥。
 - `.env.example` 补全 8 个建议配置项；新增 `backend/tests/test_config.py`（6 个用例，全部通过）。
 - 后端依赖安装到 `backend/.venv` 虚拟环境，新增 `requirements-dev.txt` 与 `pytest.ini`。
+
+### CARD-003 — Database Models & Migration
+
+- 新增 `app/models/`：`users`、`subscriptions`、`briefs`、`agent_runs`、`agent_steps` 五张 ORM 模型（SQLAlchemy 2.0 声明式）。
+- 外键约束：`subscriptions.user_id`、`agent_runs.user_id`、`agent_steps.run_id`、`briefs.user_id/run_id`；`agent_steps(run_id, step_no)` 唯一约束；JSON 字段使用 `JSON` 类型兼容 SQLite，且保留 PostgreSQL 升级可能。
+- 新增 `app/db/__init__.py`：engine / `SessionLocal` / FastAPI 依赖 `get_db`；URL 来自 CARD-002 的 Settings，SQLite 自动加 `check_same_thread=False`。
+- Alembic 初始化并生成首个 migration（`92275b8899e2 create core tables`）；`env.py` 从 Settings 注入 `sqlalchemy.url`，`target_metadata` 指向 `Base.metadata`。
+- 测试：`tests/conftest.py` 提供独立的内存 SQLite（StaticPool），`tests/test_models.py` 4 个用例覆盖建 user+subscription、run/step 关联查询、step 唯一约束、brief→run 追溯。
+- `.gitignore` 增加 `*.db` 等数据库文件忽略；venv 安装 sqlalchemy 2.0.54 / alembic 1.20.0。
