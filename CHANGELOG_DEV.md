@@ -63,3 +63,12 @@
 - 固定 `cwd` 为 workspace 根；subprocess 级超时（默认 10s，参数可调 0.1–60）由 `subprocess.run(timeout=)` 终止进程；stdout/stderr 各上限 20 KB，超限截断并置 `truncated` 标记。
 - Registry 外层 60s 兜底守卫。
 - 测试：`tests/test_bash_tool.py` 9 个用例（注册/白名单执行/rm-curl-sudo 拒绝/未加引号元字符拒绝/引号内元字符允许/超时终止/输出截断/非零退出码/cwd 固定在 workspace）。
+
+### CARD-008 — News/Search Tools
+
+- 新增 `app/news/providers.py`：`SearchProvider` 抽象 + 两个免 Key 真实源 —— `RSSSearchProvider`（Google News RSS 实时源）与 `HackerNewsProvider`（Algolia HN API）；`NewsItem(title,url,source,published_at,snippet)`。
+- 新增 `app/tools/web_search.py`：`web_search(query,limit,provider=auto)`，单 provider 失败自动回退下一个；provider 可用 `client` 注入便于离线测试。
+- 新增 `app/tools/fetch_url.py`：`fetch_url(url)`，仅允许 http/https，显式 User-Agent、20s 超时、500 KB 上限，stdlib `HTMLParser` 提取 title / article:published_time / 前 2000 字正文摘要；不执行 JS。
+- 失败统一结构化：provider 请求/解析失败抛 `ProviderError`/`FetchURLError`，由 Registry 转 `ToolResult(success=False)`，404/超时/超大页面均不崩溃。
+- httpx 升级为运行时依赖；live 冒烟：Google News 返回 3 条、HN 返回 3 条真实数据。
+- 测试：`tests/test_news_tools.py` 11 个用例（RSS/JSON 解析、provider 回退、全失败、未知 provider、HTML 提取、非 http scheme、404/超时/超大 page）。

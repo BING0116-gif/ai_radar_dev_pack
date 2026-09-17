@@ -1,0 +1,1 @@
+"""News search providers: real, key-free sources the agent can query."""
