@@ -46,3 +46,11 @@
 - 统一执行守卫：参数非法、工具异常、超时（默认取 Settings.TOOL_TIMEOUT_SECONDS，可按工具覆盖）均返回结构化 `ToolResult(success=False)`，不向上抛、不使 Agent 崩溃。
 - 超时用 `concurrent.futures` 实现，`shutdown(wait=False)` 避免被仍在运行的超时工具阻塞。
 - 测试：`tests/test_registry.py` 9 个用例（注册/重复注册拒绝/schema 导出/成功/默认参数/非法参数/未知工具/异常捕获/超时）。
+
+### CARD-006 — Filesystem Tools
+
+- 新增 `app/tools/filesystem.py`：沙箱化文件工具 `list_dir` / `read_file` / `search_content` / `write_file`（题目必做四件套）。
+- 安全沙箱：所有入参按 workspace 相对路径解析，`resolve()` 后 `is_relative_to(WORKSPACE_ROOT)` 判定，拒绝 `..` 跳转、绝对路径越界与符号链接逃逸；越界抛 `SandboxError` → Registry 结构化捕获。
+- 限制：`read_file` 上限 200 KB，非 UTF-8/二进制文件明确报错；`search_content` 递归文本检索，命中上限 50 条并带 `truncated` 标记；`write_file` 自动建父目录。
+- 相对路径统一输出 `/` 分隔（跨平台稳定）。
+- 测试：`tests/test_filesystem_tools.py` 11 个用例（注册/读写回环/列表类型/三种越界拒绝/二进制错误/超大文件/递归搜索/命中上限/空结果）。

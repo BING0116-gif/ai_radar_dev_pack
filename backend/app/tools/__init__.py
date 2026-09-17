@@ -1,0 +1,1 @@
+"""Agent-visible tools, each bound to a sandbox (workspace) boundary."""
