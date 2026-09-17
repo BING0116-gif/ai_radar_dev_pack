@@ -54,3 +54,12 @@
 - 限制：`read_file` 上限 200 KB，非 UTF-8/二进制文件明确报错；`search_content` 递归文本检索，命中上限 50 条并带 `truncated` 标记；`write_file` 自动建父目录。
 - 相对路径统一输出 `/` 分隔（跨平台稳定）。
 - 测试：`tests/test_filesystem_tools.py` 11 个用例（注册/读写回环/列表类型/三种越界拒绝/二进制错误/超大文件/递归搜索/命中上限/空结果）。
+
+### CARD-007 — Restricted Bash Tool
+
+- 新增 `app/tools/bash.py`：受限 `bash(command)`（题目必做工具）。
+- `subprocess.run` 执行、绝不经过 shell（无 `os.system`、无 `shell=True`）；命令经 `shlex.split` 解析，可执行文件必须在白名单（python/grep/find/head/tail/wc/sort/cat）且在 PATH 上。
+- 元字符防护：引号感知扫描，仅拒绝**未加引号**的 `;|&<>$\`` 与换行（引号内的 `;` 如 `python -c "a;b"` 无害且允许）。
+- 固定 `cwd` 为 workspace 根；subprocess 级超时（默认 10s，参数可调 0.1–60）由 `subprocess.run(timeout=)` 终止进程；stdout/stderr 各上限 20 KB，超限截断并置 `truncated` 标记。
+- Registry 外层 60s 兜底守卫。
+- 测试：`tests/test_bash_tool.py` 9 个用例（注册/白名单执行/rm-curl-sudo 拒绝/未加引号元字符拒绝/引号内元字符允许/超时终止/输出截断/非零退出码/cwd 固定在 workspace）。
