@@ -30,3 +30,11 @@
 - Alembic 初始化并生成首个 migration（`92275b8899e2 create core tables`）；`env.py` 从 Settings 注入 `sqlalchemy.url`，`target_metadata` 指向 `Base.metadata`。
 - 测试：`tests/conftest.py` 提供独立的内存 SQLite（StaticPool），`tests/test_models.py` 4 个用例覆盖建 user+subscription、run/step 关联查询、step 唯一约束、brief→run 追溯。
 - `.gitignore` 增加 `*.db` 等数据库文件忽略；venv 安装 sqlalchemy 2.0.54 / alembic 1.20.0。
+
+### CARD-004 — Subscription API
+
+- 新增 `app/schemas/`：`common.py`（统一响应信封 `{code,message,data}` + `ApiError`）、`subscription.py`（`SubscriptionUpdate`/`SubscriptionResponse`）。
+- 新增 `app/api/subscriptions.py`：`GET/PUT /api/subscription`，Demo 用户（name=Demo User, timezone=Asia/Shanghai）首次请求自动创建。
+- 校验：`max_items` 1–20；topics/keywords/excluded_keywords 去空白、去重复；language 默认 `zh-CN`；timezone 默认 `Asia/Shanghai` 且可修改。
+- `main.py` 注册 `ApiError` 与 `RequestValidationError` 处理器，非法输入统一返回 `{code:42200,...}` 结构。
+- 测试：`tests/test_subscription_api.py` 8 个用例（新增 8 项，全量 18 项通过）；`conftest.py` 增加 `client` fixture（覆盖 `get_db` 指向内存库）；dev 依赖新增 httpx（TestClient）。
