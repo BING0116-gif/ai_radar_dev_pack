@@ -1,10 +1,9 @@
-"""Agent loop tests: fully scripted LLM, offline registry (CARD-009)."""
-
-import json
+"""Agent loop tests: fully scripted LLM, offline registry (CARD-009/010)."""
 
 import pytest
 
 from app.agent.context import AgentContext
+from app.agent.guardrails import BriefOutputGuard
 from app.agent.loop import AgentLoop
 from app.agent.registry import ToolRegistry
 from app.core.llm_client import LLMResponse, ToolCall
@@ -68,10 +67,12 @@ def test_two_tool_calls_then_final(registry):
     assert [c.name for c in result.calls] == ["web_search", "write_file"]
     assert all(c.success for c in result.calls)
 
-    # observations were backfilled between turns (tool messages with ids)
+    # observations were backfilled between turns (tool messages with ids),
+    # and external tool output is wrapped in the untrusted-content boundary.
     tool_msgs_after_first = [m for m in llm.history[1] if m["role"] == "tool"]
     assert tool_msgs_after_first and tool_msgs_after_first[0]["tool_call_id"] == "c1"
-    assert json.loads(tool_msgs_after_first[0]["content"])["ok"] is True
+    assert "<external_content" in tool_msgs_after_first[0]["content"]
+    assert '"ok": true' in tool_msgs_after_first[0]["content"]
 
 
 # --- acceptance 2: multiple tool_calls in one turn ---------------------------
@@ -156,3 +157,45 @@ def test_external_cancel(registry):
     )
     assert result.stop_reason == "cancelled"
     assert result.step_count == 0
+
+
+# --- CARD-010: final-output guard & one-shot repair ---------------------------
+
+VALID_BRIEF = (
+    '{"title":"T","date":"2026-09-17","items":['
+    '{"title":"n","summary":"s","reason":"r","source_url":"https://example.com/x"}]}'
+)
+
+
+def test_final_valid_json_passes_guard(registry):
+    llm = ScriptedLLM(LLMResponse(content=VALID_BRIEF))
+    loop = AgentLoop(registry, llm, max_steps=5, output_guard=BriefOutputGuard())
+    result = loop.run(AgentContext(task="t"))
+    assert result.stop_reason == "final_response"
+    assert result.structured is not None
+    assert result.structured["title"] == "T"
+
+
+def test_final_invalid_json_repaired_once(registry):
+    llm = ScriptedLLM(
+        LLMResponse(content="sorry, here are bullets not json"),
+        LLMResponse(content=VALID_BRIEF),
+    )
+    loop = AgentLoop(registry, llm, max_steps=5, output_guard=BriefOutputGuard())
+    result = loop.run(AgentContext(task="t"))
+    assert result.stop_reason == "repaired"
+    assert result.structured is not None
+    # the repair turn carried a user instruction with the validation error
+    repair_msgs = llm.history[1]
+    assert any(m.get("role") == "user" and "JSON" in m.get("content", "") for m in repair_msgs)
+
+
+def test_final_invalid_twice_reported_as_invalid_output(registry):
+    llm = ScriptedLLM(
+        LLMResponse(content="not json"),
+        LLMResponse(content="still not json"),
+    )
+    loop = AgentLoop(registry, llm, max_steps=5, output_guard=BriefOutputGuard())
+    result = loop.run(AgentContext(task="t"))
+    assert result.stop_reason == "invalid_output"
+    assert result.structured is None

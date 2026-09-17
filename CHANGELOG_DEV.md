@@ -82,3 +82,11 @@
 - 每次调用记录 `ToolCallRecord`（name/args/success/output_preview，供 CARD-011 落 trace）。
 - 真实冒烟：DeepSeek 端到端运行 —— 模型自主连调两次 `web_search` 后给出最终答案（工具顺序由模型决定，非固定流程）。
 - 测试：`test_agent_loop.py` 7 个用例（两次 tool call→final、单轮多 tool_calls 回填、工具失败继续、max_steps、重复保护、不同调用不误触、取消）+ `test_llm_client.py` 4 个用例（解析/容错/配置缺失/401）。
+
+### CARD-010 — Prompts & Guardrails
+
+- 新增 `app/agent/prompts.py`：集中式 prompt 构建 —— `build_system_prompt(user, subscription, recent_titles)` 动态组装角色/身份/订阅偏好/历史去重/来源要求/停止条件；`wrap_external_content()` 以 `<external_content trust="false">` 标签隔离不可信网页数据；`DEFAULT_SYSTEM_PROMPT` 由 loop 引用（消除散落字符串）。
+- 新增 `app/agent/guardrails.py`：`BriefSchema`（title/date/items，`source_url` 用 `AnyHttpUrl` 强校验）、`BriefOutputGuard.validate()`；`extract_json()` 三级恢复（直接 JSON → ```json fence → 首尾花括号）。
+- loop 集成：工具 observation 统一经 `wrap_external_content` 包裹；最终输出挂 guard 校验，**恰好一次修复轮**（重新要求输出合法 JSON），新增 stop_reason `repaired`/`invalid_output` 与 `structured` 字段。
+- 修复：`REPAIR_INSTRUCTION` 中 JSON 花括号转义（`.format()` 冲突实测发现）。
+- 测试：`test_prompts.py` 4 个用例 + `test_guardrails.py` 7 个用例 + `test_agent_loop.py` 新增 3 个修复机制用例。全量 83 passed。

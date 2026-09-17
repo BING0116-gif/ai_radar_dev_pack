@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from app.agent.context import AgentContext
+from app.agent.guardrails import REPAIR_INSTRUCTION, ValidationResult
+from app.agent.prompts import DEFAULT_SYSTEM_PROMPT, wrap_external_content
 from app.agent.registry import ToolRegistry
 from app.core.config import get_settings
 from app.core.llm_client import LLMClient
@@ -27,13 +29,6 @@ logger = logging.getLogger("app.agent.loop")
 
 REPEAT_THRESHOLD = 3
 OUTPUT_PREVIEW_CHARS = 500
-
-# Minimal default until CARD-010 introduces the dedicated prompts module.
-DEFAULT_SYSTEM_PROMPT = (
-    "You are an AI news agent. Use the provided tools when they help. "
-    "Decide yourself which tools to call, how many times, and when to stop. "
-    "When you have enough information, reply with the final result and no tool calls."
-)
 
 
 @dataclass
@@ -48,10 +43,11 @@ class ToolCallRecord:
 
 @dataclass
 class AgentRunResult:
-    stop_reason: str  # final_response | max_steps | repeated_call | cancelled
+    stop_reason: str  # final_response | repaired | invalid_output | max_steps | repeated_call | cancelled
     content: str = ""
     step_count: int = 0
     calls: list[ToolCallRecord] = field(default_factory=list)
+    structured: dict[str, Any] | None = None  # schema-validated output when a guard is used
 
 
 class AgentLoop:
@@ -64,11 +60,13 @@ class AgentLoop:
         *,
         max_steps: int | None = None,
         repeat_threshold: int = REPEAT_THRESHOLD,
+        output_guard: "OutputGuard | None" = None,
     ):
         self.registry = registry
         self.llm = llm
         self.max_steps = max_steps or int(get_settings().AGENT_MAX_STEPS)
         self.repeat_threshold = repeat_threshold
+        self.output_guard = output_guard
 
     def run(
         self,
@@ -92,10 +90,8 @@ class AgentLoop:
 
             response = self.llm.chat(messages, tools)
 
-            if not response.tool_calls:  # final answer
-                return AgentRunResult(
-                    stop_reason="final_response", content=response.content, step_count=step, calls=calls,
-                )
+            if not response.tool_calls:  # final answer (+ optional schema guard)
+                return self._finish(response, messages, tools, step, calls)
 
             signature = tuple(
                 (tc.name, _canonical_args(tc.arguments)) for tc in response.tool_calls
@@ -121,11 +117,36 @@ class AgentLoop:
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
-                    "content": json.dumps(observation, ensure_ascii=False, default=str),
+                    "content": wrap_external_content(
+                        json.dumps(observation, ensure_ascii=False, default=str)
+                    ),
                 })
                 logger.info("step %s tool=%s success=%s", step, tc.name, result.success)
 
         return AgentRunResult(stop_reason="max_steps", step_count=self.max_steps, calls=calls)
+
+    def _finish(self, response, messages, tools, step, calls) -> AgentRunResult:
+        """Handle a final (no-tool-call) reply; validate & repair once if guarded."""
+        if self.output_guard is None:
+            return AgentRunResult(stop_reason="final_response", content=response.content,
+                                  step_count=step, calls=calls)
+
+        first = self.output_guard.validate(response.content)
+        if first.ok:
+            return AgentRunResult(stop_reason="final_response", content=response.content,
+                                  step_count=step, calls=calls, structured=first.data)
+
+        # Exactly one repair turn: ask the model to re-emit a schema-valid JSON.
+        logger.warning("final output invalid, requesting one repair: %s", first.error)
+        messages.append({"role": "assistant", "content": response.content})
+        messages.append({"role": "user", "content": REPAIR_INSTRUCTION.format(error=first.error)})
+        repaired = self.llm.chat(messages, tools)
+        second = self.output_guard.validate(repaired.content)
+        if second.ok:
+            return AgentRunResult(stop_reason="repaired", content=repaired.content,
+                                  step_count=step + 1, calls=calls, structured=second.data)
+        return AgentRunResult(stop_reason="invalid_output", content=repaired.content,
+                              step_count=step + 1, calls=calls)
 
 
 def _assistant_tool_message(response) -> dict[str, Any]:
