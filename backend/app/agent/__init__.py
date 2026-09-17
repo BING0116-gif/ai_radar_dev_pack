@@ -1,0 +1,1 @@
+"""Agent core: tool registry, runtime, and the model-driven loop."""

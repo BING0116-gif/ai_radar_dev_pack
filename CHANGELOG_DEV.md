@@ -38,3 +38,11 @@
 - 校验：`max_items` 1–20；topics/keywords/excluded_keywords 去空白、去重复；language 默认 `zh-CN`；timezone 默认 `Asia/Shanghai` 且可修改。
 - `main.py` 注册 `ApiError` 与 `RequestValidationError` 处理器，非法输入统一返回 `{code:42200,...}` 结构。
 - 测试：`tests/test_subscription_api.py` 8 个用例（新增 8 项，全量 18 项通过）；`conftest.py` 增加 `client` fixture（覆盖 `get_db` 指向内存库）；dev 依赖新增 httpx（TestClient）。
+
+### CARD-005 — Tool Registry
+
+- 新增 `app/agent/registry.py`：`ToolDefinition`（name/description/parameters_model/func/可选 timeout）、`ToolResult(success, data, error)`、`ToolRegistry`（register/get/names/definitions/schemas/execute）。
+- 参数校验与 LLM 看到的 schema 同源：`parameters_model` 为 pydantic 模型，`model_json_schema()` 导出 OpenAI 兼容 function-calling schema。
+- 统一执行守卫：参数非法、工具异常、超时（默认取 Settings.TOOL_TIMEOUT_SECONDS，可按工具覆盖）均返回结构化 `ToolResult(success=False)`，不向上抛、不使 Agent 崩溃。
+- 超时用 `concurrent.futures` 实现，`shutdown(wait=False)` 避免被仍在运行的超时工具阻塞。
+- 测试：`tests/test_registry.py` 9 个用例（注册/重复注册拒绝/schema 导出/成功/默认参数/非法参数/未知工具/异常捕获/超时）。
