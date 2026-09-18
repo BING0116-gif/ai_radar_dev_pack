@@ -1,0 +1,29 @@
+services:
+  backend:
+    build: ./backend
+    container_name: ai-radar-backend
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      # env_file above wins for real secrets; these defaults keep the demo
+      # self-contained even if a key is missing from .env
+      APP_ENV: development
+      DATABASE_URL: sqlite:////data/ai_radar.db
+      WORKSPACE_ROOT: /data/workspace
+      SCHEDULER_ENABLED: "false"
+    volumes:
+      - ai_radar_data:/data
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: ai-radar-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  ai_radar_data:

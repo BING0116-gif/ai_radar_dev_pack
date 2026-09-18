@@ -158,3 +158,11 @@
 - 新增 `tests/test_eval.py`：指标纯函数 + 5 画像全流程 eval（成功率先验 1.0、dup>0、source=1.0、报告内容断言）。
 - **修复**：`run_agent` 此前构建了定制 system_prompt 但未传给 `AgentLoop.run`（回退默认值）—— 集成测试实测发现并修复，现在订阅偏好/历史去重真实进入 prompt。
 - 覆盖清单：path/bash sandbox、Registry、Loop、max_steps、dedup、Brief schema、API、tracing、run_agent 全链路均有自动化测试。全量 126 passed，`pytest` 一键可跑，Agent Loop 完全不依赖真实 LLM。
+
+### CARD-019 — Docker & README
+
+- 新增 `backend/Dockerfile`（python:3.12-slim + entrypoint）+ `backend/entrypoint.sh`：容器启动先 `alembic upgrade head`（**数据库初始化一步完成**）再起 uvicorn。
+- 新增 `frontend/Dockerfile`（node 多阶段 build → nginx:alpine）+ `frontend/nginx.conf`：SPA fallback + `/api` 同源代理到 backend:8000。
+- 新增 `docker-compose.yml`：backend（端口 8000，`env_file: .env` + SQLite/workspace 落到命名卷 `ai_radar_data`）+ frontend（端口 5173:80，依赖 backend）。
+- 新增 `README.md`：项目简介 / Architecture / Agent Loop / Tools / Docker 与本地 Quick Start / 环境变量表 / Demo 流程 / Trace 示例 / 测试命令 / 设计决策 / 已知限制 / 未来扩展。
+- 验证：`docker compose config` OK；Docker Desktop 守护进程拉起后实际 build 后端镜像（前台仅 config，build 后台进行）；本机可跑命令（pytest 126 / npm run build / alembic upgrade）全部实测通过。
