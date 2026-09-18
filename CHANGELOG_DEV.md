@@ -166,3 +166,11 @@
 - 新增 `docker-compose.yml`：backend（端口 8000，`env_file: .env` + SQLite/workspace 落到命名卷 `ai_radar_data`）+ frontend（端口 5173:80，依赖 backend）。
 - 新增 `README.md`：项目简介 / Architecture / Agent Loop / Tools / Docker 与本地 Quick Start / 环境变量表 / Demo 流程 / Trace 示例 / 测试命令 / 设计决策 / 已知限制 / 未来扩展。
 - 验证：`docker compose config` OK；Docker Desktop 守护进程拉起后实际 build 后端镜像（前台仅 config，build 后台进行）；本机可跑命令（pytest 126 / npm run build / alembic upgrade）全部实测通过。
+
+### CARD-020 — Demo & Interview Polish
+
+- 代码清理：全库扫描 `print(/pdb/breakpoint/TODO/FIXME/XXX` 与密钥字面量 —— app 零命中；唯一“sk-”命中为测试夹具；`workspace/briefing.json`（环境产物，非本项目生成）保持未跟踪、未提交。
+- 真实全链路实测：本地 venv + 真实 DeepSeek，`POST /api/runs` → `run#1 completed`，25 步 trace（llm_turn/tool_call/tool_result 交错，非固定顺序），简报 10 条带真实来源 URL 与理由；`stop_reason=repaired` == guardrail 修复机制在真实 LLM 生效。
+- 新增 `docs/DEMO_SCRIPT.md`：3 分钟分段时间线（0:00–3:00）＋ 备用录屏方案 ＋ 防追问要点。
+- 新增 `docs/INTERVIEW_QA.md`：10 道必会问答速答（固定 workflow/LangChain/防死循环/bash 限制/prompt injection/去重/单 Agent/多 Agent 拆分/token 成本/生产化改动）。
+- commit 历史核对：19 个 commit 一卡一提交、Conventional Commits、无 `.env`/密钥入库。
