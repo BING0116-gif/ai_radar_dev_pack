@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String
+from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, utcnow
@@ -24,6 +24,8 @@ class Subscription(Base):
     language: Mapped[str] = mapped_column(String(16), default="zh")
     notification_channel: Mapped[str] = mapped_column(String(32), default="none")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # true = 生成简报先进入"待审"，人工通过后才发布+通知（HITL）
+    require_approval: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("0"))
 
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)

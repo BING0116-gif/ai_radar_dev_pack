@@ -6,7 +6,11 @@ import MarkdownIt from 'markdown-it'
 
 const props = defineProps({
   brief: { type: Object, required: true },
+  // item_key -> verdict（like/dislike/read），来自 GET /api/feedback
+  feedbackMap: { type: Object, default: () => ({}) },
 })
+
+const emit = defineEmits(['feedback'])
 
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true })
 
@@ -14,6 +18,23 @@ const items = computed(() => (Array.isArray(props.brief.items) ? props.brief.ite
 const hasItems = computed(() => items.value.length > 0)
 
 const renderedMarkdown = computed(() => md.render(props.brief.content_markdown || ''))
+
+function itemKey(item) {
+  // 稳定标识优先用来源 URL（已持久化 items 必有），无则回退标题
+  return item.source_url || String(item.title || '').trim()
+}
+
+function currentVerdict(item) {
+  return props.feedbackMap[itemKey(item)] || null
+}
+
+function setVerdict(item, verdict) {
+  const key = itemKey(item)
+  const active = currentVerdict(item)
+  // 再次点击同一按钮 = 取消反馈
+  const next = active === verdict ? null : verdict
+  emit('feedback', { item_key: key, item_title: item.title || '', verdict: next })
+}
 </script>
 
 <template>
@@ -39,9 +60,26 @@ const renderedMarkdown = computed(() => md.render(props.brief.content_markdown |
           <span>{{ item.why_it_matters }}</span>
         </div>
 
-        <a v-if="item.source_url" class="read-link" :href="item.source_url" target="_blank" rel="noopener noreferrer">
-          阅读原文 ↗
-        </a>
+        <div class="news-actions">
+          <a v-if="item.source_url" class="read-link" :href="item.source_url" target="_blank" rel="noopener noreferrer">
+            阅读原文 ↗
+          </a>
+
+          <div class="feedbacks">
+            <button
+              class="fb" :class="{ active: currentVerdict(item) === 'like' }"
+              title="想继续看这类内容" @click="setVerdict(item, 'like')"
+            >赞</button>
+            <button
+              class="fb" :class="{ active: currentVerdict(item) === 'dislike' }"
+              title="不再想看这类内容" @click="setVerdict(item, 'dislike')"
+            >不感兴趣</button>
+            <button
+              class="fb" :class="{ active: currentVerdict(item) === 'read' }"
+              title="标记为已读" @click="setVerdict(item, 'read')"
+            >已读</button>
+          </div>
+        </div>
       </article>
     </div>
 
@@ -139,6 +177,14 @@ const renderedMarkdown = computed(() => md.render(props.brief.content_markdown |
   color: #8a6d1a;
 }
 
+.news-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .read-link {
   display: inline-block;
   margin-top: 10px;
@@ -150,6 +196,35 @@ const renderedMarkdown = computed(() => md.render(props.brief.content_markdown |
 
 .read-link:hover {
   text-decoration: underline;
+}
+
+.feedbacks {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.fb {
+  border: 1px solid var(--border);
+  background: #faf8f4;
+  color: var(--muted, #8a8378);
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 2px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.fb:hover {
+  border-color: var(--pine);
+  color: var(--pine);
+}
+
+.fb.active {
+  background: #eef3ef;
+  border-color: var(--pine);
+  color: var(--pine);
+  font-weight: 600;
 }
 
 /* markdown 兜底（仅旧数据） */

@@ -52,6 +52,7 @@ def create_run(
         run_id=summary["run_id"],
         stop_reason=summary["stop_reason"],
         brief_id=summary["brief_id"],
+        brief_status=summary["brief_status"],
         content=summary.get("content", ""),
         mode=summary.get("mode", "brief"),
         token_input=summary.get("token_input", 0),

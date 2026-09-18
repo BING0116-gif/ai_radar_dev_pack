@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import MarkdownIt from 'markdown-it'
 import * as api from '../api'
 import BriefReader from '../components/BriefReader.vue'
 
@@ -13,6 +14,11 @@ const chatQuestion = ref('')
 const chatAnswer = ref('')
 const chatRun = ref(null)
 const chatLoading = ref(false)
+const pendingBriefs = ref([])
+const feedbackMap = ref({})
+const reviewing = ref(false)
+
+const md = new MarkdownIt({ html: false, linkify: true, breaks: true })
 
 const latest = computed(() => briefs.value[0] || null)
 
@@ -28,13 +34,24 @@ const stats = computed(() => {
   }
 })
 
+const renderedChat = computed(() => md.render(chatAnswer.value || ''))
+
 async function refresh() {
   loading.value = true
   error.value = ''
   try {
-    const [briefList, runList] = await Promise.all([api.getBriefs(), api.getRuns()])
+    const [briefList, runList, reviewList, feedbackRows] = await Promise.all([
+      api.getBriefs(),
+      api.getRuns(),
+      api.getReviews(),
+      api.getFeedback(),
+    ])
     briefs.value = briefList
     runs.value = runList
+    pendingBriefs.value = reviewList
+    const map = {}
+    for (const row of feedbackRows) map[row.item_key] = row.verdict
+    feedbackMap.value = map
     if (briefList.length) {
       detail.value = await api.getBrief(briefList[0].id)
     } else {
@@ -51,12 +68,45 @@ async function generateNow() {
   generating.value = true
   error.value = ''
   try {
-    await api.createRun()
+    const res = await api.createRun()
     await refresh()
+    if (res && res.brief_status === 'pending') {
+      scrollToReviewWorkbench()
+    }
   } catch (err) {
     error.value = err.message
   } finally {
     generating.value = false
+  }
+}
+
+async function decideReview(briefId, verdict) {
+  reviewing.value = true
+  error.value = ''
+  try {
+    if (verdict === 'approve') await api.approveReview(briefId)
+    else await api.rejectReview(briefId)
+    await refresh()
+  } catch (err) {
+    error.value = err.message
+  } finally {
+    reviewing.value = false
+  }
+}
+
+async function onFeedback({ item_key, item_title, verdict }) {
+  try {
+    if (verdict === null) {
+      await api.deleteFeedback(item_key)
+    } else {
+      await api.submitFeedback({ item_key, item_title, verdict })
+    }
+    const rows = await api.getFeedback()
+    const map = {}
+    for (const row of rows) map[row.item_key] = row.verdict
+    feedbackMap.value = map
+  } catch (err) {
+    error.value = err.message
   }
 }
 
@@ -79,6 +129,15 @@ async function askAgent() {
 
 function fmtTokens(n) {
   return Number(n || 0).toLocaleString()
+}
+
+function statusLabel(status) {
+  return { pending: '待审', rejected: '已打回', published: '已发布' }[status] || status
+}
+
+function scrollToReviewWorkbench() {
+  const el = document.querySelector('.review-workbench')
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 onMounted(refresh)
@@ -114,7 +173,31 @@ onMounted(refresh)
           <span class="hint">回答 · run #{{ chatRun.run_id }} · {{ fmtTokens(chatRun.token_input) }} 进 / {{ fmtTokens(chatRun.token_output) }} 出 tokens</span>
           <button class="link-btn" @click="chatQuestion = ''; chatAnswer = ''; chatRun = null">清空</button>
         </div>
-        <p class="chat-text">{{ chatAnswer }}</p>
+        <div class="md-wrap" v-html="renderedChat"></div>
+      </div>
+    </div>
+
+    <!-- A2: 待审简报工作台（HITL） -->
+    <div v-if="pendingBriefs.length" class="card review-workbench">
+      <div class="row-card" style="align-items: baseline">
+        <h3 class="section-title" style="margin: 0">待审简报</h3>
+        <span class="chip warn">{{ pendingBriefs.length }} 篇等待你确认发布</span>
+      </div>
+      <div
+        v-for="brief in pendingBriefs"
+        :key="brief.id"
+        class="review-item"
+      >
+        <div class="review-body">
+          <div class="review-title">{{ brief.title }}</div>
+          <div class="hint" style="font-size: 12px">
+            {{ brief.brief_date }} · {{ brief.item_count }} 条 · run #{{ brief.run_id }}
+          </div>
+        </div>
+        <div class="review-actions">
+          <button class="btn btn-sm btn-soft" :disabled="reviewing" @click="decideReview(brief.id, 'reject')">打回</button>
+          <button class="btn btn-sm" :disabled="reviewing" @click="decideReview(brief.id, 'approve')">通过并发布</button>
+        </div>
       </div>
     </div>
 
@@ -144,15 +227,24 @@ onMounted(refresh)
 
     <!-- 今日简报大卡 -->
     <div class="card">
-      <p v-if="loading" class="hint">加载中…</p>
+      <div v-if="loading" class="skeleton">
+        <div class="sk sk-title"></div>
+        <div class="sk sk-line"></div>
+        <div class="sk sk-line short"></div>
+        <div class="sk sk-card"></div>
+        <div class="sk sk-card"></div>
+      </div>
       <div v-else-if="detail">
         <div class="row-card" style="align-items: baseline">
           <h3 class="section-title">{{ detail.title }}</h3>
-          <span class="hint">
-            {{ detail.brief_date }} · {{ detail.item_count }} 条 · run #{{ detail.run_id }}
-          </span>
+          <div class="row-card" style="gap: 8px">
+            <span v-if="detail.status && detail.status !== 'published'" class="chip warn">{{ statusLabel(detail.status) }}</span>
+            <span class="hint">
+              {{ detail.brief_date }} · {{ detail.item_count }} 条 · run #{{ detail.run_id }}
+            </span>
+          </div>
         </div>
-        <BriefReader :brief="detail" />
+        <BriefReader :brief="detail" :feedback-map="feedbackMap" @feedback="onFeedback" />
       </div>
       <p v-else class="hint">暂无简报，点击「立即生成」开始。</p>
     </div>
@@ -221,13 +313,6 @@ onMounted(refresh)
   margin-bottom: 6px;
 }
 
-.chat-text {
-  white-space: pre-wrap;
-  word-break: break-word;
-  margin: 0;
-  line-height: 1.7;
-}
-
 .link-btn {
   border: none;
   background: none;
@@ -239,5 +324,118 @@ onMounted(refresh)
 
 .link-btn:hover {
   color: var(--pine);
+}
+
+/* ---- markdown 回答排版（与 BriefReader 兜底一致） ---- */
+.md-wrap {
+  line-height: 1.7;
+  font-size: 14px;
+}
+
+.md-wrap :deep(h1) {
+  font-size: 17px;
+  margin: 0 0 10px;
+}
+
+.md-wrap :deep(h2) {
+  font-size: 15px;
+  margin: 14px 0 6px;
+}
+
+.md-wrap :deep(h3) {
+  font-size: 14px;
+  margin: 12px 0 4px;
+}
+
+.md-wrap :deep(p) {
+  margin: 8px 0;
+}
+
+.md-wrap :deep(a) {
+  color: var(--pine);
+  word-break: break-all;
+}
+
+.md-wrap :deep(ul), .md-wrap :deep(ol) {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+.md-wrap :deep(li) {
+  margin: 4px 0;
+}
+
+.md-wrap :deep(code) {
+  background: #f1eee8;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12.5px;
+}
+
+/* ---- 待审工作台 ---- */
+.review-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.review-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.review-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-sm {
+  padding: 5px 12px;
+  font-size: 13px;
+}
+
+.btn-soft {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--ink);
+}
+
+.btn-soft:hover {
+  border-color: var(--pine);
+  color: var(--pine);
+}
+
+.chip.warn {
+  background: #f5eedd;
+  color: #8a6d1a;
+}
+
+/* ---- 骨架屏 ---- */
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sk {
+  border-radius: 8px;
+  background: linear-gradient(90deg, #efece6 25%, #f7f4ee 37%, #efece6 63%);
+  background-size: 400% 100%;
+  animation: sk-shimmer 1.4s ease infinite;
+}
+
+.sk-title { height: 18px; width: 40%; }
+.sk-line { height: 12px; width: 70%; }
+.sk-line.short { width: 45%; }
+.sk-card { height: 76px; }
+
+@keyframes sk-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
 }
 </style>

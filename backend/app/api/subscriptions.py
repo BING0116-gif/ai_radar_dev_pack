@@ -37,6 +37,7 @@ def _to_response(user: User, sub: Subscription | None) -> SubscriptionResponse:
         language=sub.language if sub else "zh-CN",
         notification_channel=sub.notification_channel if sub else "none",
         enabled=sub.enabled if sub else True,
+        require_approval=sub.require_approval if sub else False,
     )
 
 
@@ -74,6 +75,7 @@ def update_subscription(
     sub.language = payload.language
     sub.notification_channel = payload.notification_channel
     sub.enabled = payload.enabled
+    sub.require_approval = payload.require_approval
 
     try:
         db.commit()

@@ -25,6 +25,16 @@ async function refresh() {
   }
 }
 
+function statusLabel(status) {
+  return { pending: '待审', rejected: '已打回', published: '已发布' }[status] || status
+}
+
+function statusClass(status) {
+  if (status === 'pending') return 'warn'
+  if (status === 'rejected') return 'fail'
+  return ''
+}
+
 async function selectBrief(id) {
   selectedId.value = id
   detailLoading.value = true
@@ -50,11 +60,11 @@ onMounted(refresh)
       <p v-if="loading" class="hint">加载中…</p>
       <table v-else>
         <thead>
-          <tr><th>日期</th><th>标题</th><th>条数</th></tr>
+          <tr><th>日期</th><th>标题</th><th>状态</th><th>条数</th></tr>
         </thead>
         <tbody>
           <tr v-if="!briefs.length">
-            <td colspan="3" class="hint">暂无简报</td>
+            <td colspan="4" class="hint">暂无简报</td>
           </tr>
           <tr
             v-for="brief in briefs"
@@ -65,6 +75,14 @@ onMounted(refresh)
           >
             <td>{{ brief.brief_date }}</td>
             <td>{{ brief.title }}</td>
+            <td>
+              <span
+                v-if="brief.status && brief.status !== 'published'"
+                class="chip"
+                :class="statusClass(brief.status)"
+              >{{ statusLabel(brief.status) }}</span>
+              <span v-else class="hint">已发布</span>
+            </td>
             <td>{{ brief.item_count }}</td>
           </tr>
         </tbody>

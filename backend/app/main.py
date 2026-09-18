@@ -13,6 +13,8 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.api.feedback import router as feedback_router
+from app.api.reviews import router as reviews_router
 from app.api.runs import router as runs_router
 from app.api.subscriptions import router as subscriptions_router
 from app.core.config import get_settings
@@ -54,12 +56,26 @@ async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
 
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    """Pydantic 422s -> the same unified error envelope."""
-    return JSONResponse(status_code=422, content=error_response(42200, "validation_error", exc.errors()))
+    """Pydantic 422s -> the same unified error envelope.
+
+    ``exc.errors()`` may embed non-serializable context values (e.g. a
+    ValueError raised by a field validator), so stringify ``ctx`` before
+    encoding the response.
+    """
+    errors = []
+    for item in exc.errors():
+        clean = {k: v for k, v in item.items() if k != "ctx"}
+        ctx = item.get("ctx")
+        if ctx:
+            clean["ctx"] = {k: str(v) for k, v in ctx.items()}
+        errors.append(clean)
+    return JSONResponse(status_code=422, content=error_response(42200, "validation_error", errors))
 
 
 app.include_router(subscriptions_router)
 app.include_router(runs_router)
+app.include_router(reviews_router)
+app.include_router(feedback_router)
 
 
 @app.get("/health")

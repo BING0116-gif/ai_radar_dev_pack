@@ -37,6 +37,7 @@ class RunCreated(BaseModel):
     run_id: int
     stop_reason: str
     brief_id: int | None = None
+    brief_status: str | None = None
     content: str = ""
     mode: str = "brief"
     token_input: int = 0
@@ -58,6 +59,8 @@ class BriefSummary(BaseModel):
     title: str = ""
     item_count: int = 0
     run_id: int
+    # published | pending | rejected
+    status: str = "published"
     created_at: datetime
 
 

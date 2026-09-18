@@ -13,6 +13,7 @@ const form = ref({
   language: 'zh-CN',
   timezone: 'Asia/Shanghai',
   notification_channel: 'none',
+  require_approval: false,
 })
 const topicsText = ref('')
 const keywordsText = ref('')
@@ -40,6 +41,7 @@ async function load() {
       language: data.language || 'zh-CN',
       timezone: data.timezone || 'Asia/Shanghai',
       notification_channel: data.notification_channel || 'none',
+      require_approval: data.require_approval || false,
     }
     topicsText.value = fromList(data.topics)
     keywordsText.value = fromList(data.keywords)
@@ -65,6 +67,7 @@ async function save() {
       language: form.value.language,
       timezone: form.value.timezone,
       notification_channel: form.value.notification_channel,
+      require_approval: form.value.require_approval,
     })
     saved.value = true
   } catch (err) {
@@ -128,6 +131,14 @@ onMounted(load)
               <option value="email">Email（需配置）</option>
             </select>
           </label>
+
+          <label class="field switch-field">
+            <span>先审后发（HITL）</span>
+            <span class="switch-row">
+              <input v-model="form.require_approval" type="checkbox" class="switch" />
+              <span class="hint">开启后，生成的简报先进入「待审」队列，你确认后才发布并通知</span>
+            </span>
+          </label>
         </div>
 
         <button class="btn" :disabled="saving" @click="save">
@@ -137,3 +148,22 @@ onMounted(load)
     </div>
   </div>
 </template>
+
+<style scoped>
+.switch-field {
+  grid-column: 1 / -1;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.switch {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--pine);
+  cursor: pointer;
+}
+</style>

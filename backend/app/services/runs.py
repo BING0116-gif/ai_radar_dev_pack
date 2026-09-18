@@ -18,7 +18,7 @@ from app.agent.registry import ToolRegistry
 from app.agent.prompts import build_chat_system_prompt, build_system_prompt
 from app.core.config import get_settings
 from app.core.llm_client import LLMClient, OpenAICompatibleClient
-from app.models import Brief, Subscription, User
+from app.models import Brief, Feedback, Subscription, User
 from app.news.dedup import extract_history_entries
 from app.services.briefs import persist_brief
 from app.services.tracing import DbTracer
@@ -66,6 +66,27 @@ def recent_titles(db: Session, user_id: int, days: int = 7) -> list[str]:
     return titles[:30]
 
 
+def recent_feedback(db: Session, user_id: int, limit: int = 40) -> dict[str, list[str]]:
+    """Group the user's latest feedback titles by verdict (personalization signals).
+
+    Only like/dislike are fed to generation; "read" is kept out of the prompt
+    (it means "seen", not "dislike") but exposed to the UI.
+    """
+    signals: dict[str, list[str]] = {"like": [], "dislike": [], "read": []}
+    rows = (
+        db.query(Feedback)
+        .filter(Feedback.user_id == user_id)
+        .order_by(Feedback.updated_at.desc())
+        .limit(limit)
+        .all()
+    )
+    for row in rows:
+        bucket = signals.get(row.verdict)
+        if bucket is not None and row.item_title and row.item_title not in bucket:
+            bucket.append(row.item_title)
+    return signals
+
+
 def run_agent(
     db: Session,
     user_id: int,
@@ -106,7 +127,12 @@ def run_agent(
         guard = None
         agent_task = task or ""
     else:
-        system_prompt = build_system_prompt(user_info, sub_info, recent_titles=recent_titles(db, user_id))
+        system_prompt = build_system_prompt(
+            user_info,
+            sub_info,
+            recent_titles=recent_titles(db, user_id),
+            feedback_signals=recent_feedback(db, user_id),
+        )
         guard = BriefOutputGuard()
         agent_task = task or _task_instruction(subscription)
 
@@ -124,6 +150,7 @@ def run_agent(
         "run_id": tracer.run.id,
         "stop_reason": result.stop_reason,
         "brief_id": None,
+        "brief_status": None,
         "item_count": 0,
         "notification_sent": False,
         "error": None,
@@ -140,10 +167,19 @@ def run_agent(
         )
         summary["brief_id"] = brief.id
         summary["item_count"] = brief.item_count
-        summary["notification_sent"] = _notify(
-            (notifiers if notifiers is not None else build_default_notifiers()),
-            subscription, max_items, brief.item_count,
-        )
+
+        # HITL：订阅要求"先审后发"时，简报保持待审，通知后置到审批通过。
+        if subscription and subscription.require_approval:
+            brief.status = "pending"
+            db.commit()
+            summary["brief_status"] = "pending"
+            summary["notification_sent"] = False
+        else:
+            summary["brief_status"] = "published"
+            summary["notification_sent"] = _notify(
+                (notifiers if notifiers is not None else build_default_notifiers()),
+                subscription, max_items, brief.item_count,
+            )
     elif result.stop_reason not in SUCCESS_STOP_REASONS:
         summary["error"] = f"run ended with {result.stop_reason}"
     return summary
@@ -170,3 +206,52 @@ def _task_instruction(subscription) -> str:
         f"为今日生成一份个性化 AI 新闻简报：重点围绕 {topics_text}。"
         "按要求的 JSON 结构输出最终简报（每一条都必须有真实来源 URL）。"
     )
+
+
+# --- HITL review workflow ------------------------------------------------------
+
+
+def pending_briefs(db: Session, user_id: int, limit: int = 20) -> list[Brief]:
+    """Briefs awaiting human approval, newest first."""
+    return (
+        db.query(Brief)
+        .filter(Brief.user_id == user_id, Brief.status == "pending")
+        .order_by(Brief.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+def reject_brief(db: Session, brief_id: int) -> Brief:
+    """Reject a pending brief; raises ValueError for missing / not-pending rows."""
+    brief = db.get(Brief, brief_id)
+    if brief is None:
+        raise ValueError("brief not found")
+    if brief.status != "pending":
+        raise ValueError("brief is not pending")
+    brief.status = "rejected"
+    db.commit()
+    return brief
+
+
+def approve_brief(db: Session, brief_id: int, *, notifiers: dict[str, Notifier] | None = None) -> Brief:
+    """Publish a pending brief (HITL approval) and *then* send the notification."""
+    brief = db.get(Brief, brief_id)
+    if brief is None:
+        raise ValueError("brief not found")
+    if brief.status != "pending":
+        raise ValueError("brief is not pending")
+    brief.status = "published"
+    db.commit()
+
+    subscription = (
+        db.query(Subscription)
+        .filter(Subscription.user_id == brief.user_id)
+        .order_by(Subscription.id)
+        .first()
+    )
+    _notify(
+        notifiers if notifiers is not None else build_default_notifiers(),
+        subscription, subscription.max_items if subscription else 5, brief.item_count,
+    )
+    return brief

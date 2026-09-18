@@ -52,3 +52,30 @@ export function getBrief(briefId) {
 export function createRun(payload = {}) {
   return request('/api/runs', { method: 'POST', body: JSON.stringify(payload) })
 }
+
+// HITL 审批流
+export function getReviews() {
+  return request('/api/reviews')
+}
+
+export function approveReview(briefId) {
+  return request(`/api/reviews/${briefId}/approve`, { method: 'POST' })
+}
+
+export function rejectReview(briefId) {
+  return request(`/api/reviews/${briefId}/reject`, { method: 'POST' })
+}
+
+// 单条新闻反馈（个性化信号）
+export function getFeedback() {
+  return request('/api/feedback')
+}
+
+export function submitFeedback(payload) {
+  return request('/api/feedback', { method: 'POST', body: JSON.stringify(payload) })
+}
+
+export function deleteFeedback(itemKey) {
+  // item_key 可能是含 / 的来源 URL，必须走 query 参数（路径段会截断）
+  return request(`/api/feedback?item_key=${encodeURIComponent(itemKey)}`, { method: 'DELETE' })
+}

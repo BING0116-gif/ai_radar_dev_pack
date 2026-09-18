@@ -101,11 +101,12 @@ Linux/macOS 将 `.venv\Scripts\` 换为 `.venv/bin/`。
 
 ## Demo 流程（面试演示建议）
 
-1. 打开 Settings，填写身份与关注主题（如 Agent Developer / AI Coding / Claude），保存。
+1. 打开 Settings，填写身份与关注主题（如 Agent Developer / AI Coding / Claude），保存；可开启「先审后发（HITL）」演练审批流。
 2. Dashboard 点「立即生成」，等待 Agent 完成（真实 LLM 会自主搜索 → 决定接下来做什么）。
-3. 「运行轨迹」页按 step 顺序查看：`tool_call`/`llm_turn`/`tool_result` 交错出现、工具不重复成套 → 证明顺序由模型决定。
-4. 「历史简报」页查看生成的 Markdown 简报（每条含来源 URL 与理由）。
-5. 再次运行 → 观察新简报利用历史去重。
+3. 「运行轨迹」页按 step 顺序查看：`tool_call`/`llm_turn`/`tool_result` 交错出现、工具不重复成套 → 证明顺序由模型决定；llm_turn 节点显示每轮 token 用量。
+4. 「历史简报」页查看生成的 Markdown 简报（每条含来源 URL 与理由）；每日新闻卡片可点「赞 / 不感兴趣 / 已读」，作为个性化信号影响后续生成。
+5. Dashboard「向 Agent 提问」可下任意自由任务（chat 模式，同一 Agent Loop）。
+6. 再次运行 → 观察新简报利用历史去重与反馈信号。
 
 ## Trace 示例（示意）
 

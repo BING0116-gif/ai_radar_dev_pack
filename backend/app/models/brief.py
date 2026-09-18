@@ -20,6 +20,9 @@ class Brief(Base):
     content_markdown: Mapped[str] = mapped_column(Text, default="")
     item_count: Mapped[int] = mapped_column(Integer, default=0)
     items_json: Mapped[list] = mapped_column(JSON, default=list, server_default=text("'[]'"))
+    # published | pending | rejected — "pending" 表示等待人工审批（HITL）
+    status: Mapped[str] = mapped_column(String(16), default="published",
+                                        server_default=text("'published'"))
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
     user: Mapped["User"] = relationship()

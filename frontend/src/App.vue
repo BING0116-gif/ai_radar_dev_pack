@@ -273,7 +273,7 @@ textarea {
 /* KPI 指标卡 */
 .kpi-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 14px;
   margin-bottom: 20px;
 }
@@ -315,6 +315,7 @@ textarea {
 .chip-gray { background: #f1eee8; color: #6b6b6b; }
 .ok { background: #eef3ef; color: #3e6b5a; font-weight: 600; }
 .fail { background: #fdf0ef; color: #b0413e; font-weight: 600; }
+.warn { background: #f5eedd; color: #8a6d1a; font-weight: 600; }
 
 @media (max-width: 760px) {
   .layout {

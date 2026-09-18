@@ -34,6 +34,7 @@ def build_system_prompt(
     user: dict[str, Any],
     subscription: dict[str, Any],
     recent_titles: list[str] | None = None,
+    feedback_signals: dict[str, list[str]] | None = None,
 ) -> str:
     """Assemble the system prompt from the user's identity and preferences."""
     parts = [ROLE_LINE, "", UNTRUSTED_BOUNDARY_LINE, "", "## 用户信息"]
@@ -47,6 +48,18 @@ def build_system_prompt(
     if excluded:
         parts.append(f"- 排除关键词: {', '.join(excluded)}")
     parts.append(f"- 每期条数: {subscription.get('max_items', 5)}；语言: {subscription.get('language', 'zh-CN')}")
+
+    if feedback_signals:
+        liked = feedback_signals.get("like", [])
+        disliked = feedback_signals.get("dislike", [])
+        if liked or disliked:
+            parts.append("")
+            parts.append("## 个性化反馈信号（用户对历史内容的态度，参考但不盲从）")
+            if liked:
+                parts.append("- 用户赞过/想继续看这类内容: " + "；".join(liked))
+            if disliked:
+                parts.append("- 用户表示不感兴趣，请避免类似的标题/主题: " + "；".join(disliked))
+            parts.append("- 理解以上信号背后的偏好，而不是逐字匹配标题。")
 
     if recent_titles:
         parts.append("")

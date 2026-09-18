@@ -27,6 +27,7 @@ class SubscriptionUpdate(BaseModel):
     language: str = "zh-CN"
     notification_channel: str = "none"
     enabled: bool = True
+    require_approval: bool = False
     timezone: str = "Asia/Shanghai"
     role: str | None = None  # optional identity change on the demo user
 
@@ -53,3 +54,4 @@ class SubscriptionResponse(BaseModel):
     language: str
     notification_channel: str
     enabled: bool
+    require_approval: bool = False

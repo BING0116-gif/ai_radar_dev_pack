@@ -205,3 +205,22 @@
 **验证**
 - 后端新增 6 个用例：llm_client usage 解析 2（含缺失默认 0）、run_api chat 模式 4（chat 返回 content/token 且不落 Brief、空 task 42202、非法 mode 42201、无 body 兼容）。全量 **134 passed**。
 - `npm run build` 通过；Docker 全栈 + 真实 DeepSeek 实测 chat 模式与 token 统计（见下节）。
+
+### 功能增强 A2 — 先审后发（HITL）+ 个性化反馈闭环 + UI 精致化
+
+**A2 人工审批（参考 Hermes Agent 等高星项目的 command-approval 模式）**
+- `Brief.status`（published/pending/rejected）+ `Subscription.require_approval` 新列 + `feedbacks` 表；迁移 `b7e9f2d4a10c`（`alembic` 已应用到运行库）。
+- 开启"先审后发"后，`run_agent` 生成的简报落为 `pending` 且**通知后置**；新增 `GET /api/reviews`（待审队列）、`POST /api/reviews/{id}/approve`（发布 + 才发送通知）、`POST .../reject`（打回）。非 pending 审批 → `42204`；不存在 → `40402`。
+- 前端：`Settings` 新增"先审后发（HITL）"开关；`Dashboard` 新增待审工作台（通过并发布 / 打回，`review-workbench` 自动滚动定位）。
+
+**个性化反馈闭环（用量与反馈闭环 → 影响下次生成）**
+- 每条新闻可点「赞 / 不感兴趣 / 已读」（`BriefReader` 按钮，再次点击取消）；`POST /api/feedback` upsert（同 key 最新态度生效），`DELETE /api/feedback?item_key=` 取消（query 参数以兼容含 `/` 的来源 URL）。
+- `recent_feedback` 将最近 40 条 like/dislike 标题注入 `build_system_prompt` 的「个性化反馈信号」段（"read" 不进生成，只留 UI）；每次 brief 生成自动携带。
+- 修复：`RequestValidationError` 处理器清洗不可序列化的 `ctx`（field_validator 抛 ValueError 时不再 500）。
+
+**UI 精致化**
+- Dashboard 骨架屏加载动画（替换"加载中…"）；chat 回答改 markdown-it 渲染（复用安全配置 `html:false`）；KPI 行适配 5 卡；新增 `chip.warn` 待审/已打回徽标（Dashboard/History 共用）；History 列表显示发布状态列。
+
+**验证**
+- 新增 `tests/test_reviews.py` 9 个用例：待审-通过-通知链、打回、缺审/重复审批 40402/42204、反馈 upsert/DELETE（含 URL key）、非法 verdict 42200、prompt 注入（recent_feedback 分组 + system prompt 含信号 + read 不进 prompt）。全量 **143 passed**；`npm run build` 通过。
+- Docker 全栈 + 真实 DeepSeek 实测：开启审批 → run #8 生成 5 条简报进入 pending → 审批通过变 published；重复审批 422/42204；反馈点赞-已读 upsert 单行、URL 含 `/` 的 key 删除成功。cleanup 测试数据、`require_approval` 已复位。
