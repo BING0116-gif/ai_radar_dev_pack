@@ -22,6 +22,9 @@ const md = new MarkdownIt({ html: false, linkify: true, breaks: true })
 
 const latest = computed(() => briefs.value[0] || null)
 
+// 首页只展示最近 5 次运行，完整列表在「运行轨迹」页
+const recentRuns = computed(() => runs.value.slice(0, 5))
+
 const stats = computed(() => {
   const ok = runs.value.filter((r) => r.status === 'completed').length
   const total = runs.value.length
@@ -129,6 +132,14 @@ async function askAgent() {
 
 function fmtTokens(n) {
   return Number(n || 0).toLocaleString()
+}
+
+function fmtTs(iso) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 function statusLabel(status) {
@@ -249,23 +260,26 @@ onMounted(refresh)
       <p v-else class="hint">暂无简报，点击「立即生成」开始。</p>
     </div>
 
-    <h3 class="section-title">最近运行</h3>
+    <h3 class="section-title" style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px">
+      <span>最近运行</span>
+      <span class="hint" style="font-size: 12px">仅显示最近 5 次，完整列表见「运行轨迹」</span>
+    </h3>
     <div class="card">
       <table>
         <thead>
           <tr><th>ID</th><th>状态</th><th>步数</th><th>输入 tokens</th><th>输出 tokens</th><th>开始时间</th></tr>
         </thead>
         <tbody>
-          <tr v-if="!runs.length">
+          <tr v-if="!recentRuns.length">
             <td colspan="6" class="hint">暂无运行记录</td>
           </tr>
-          <tr v-for="run in runs" :key="run.id">
+          <tr v-for="run in recentRuns" :key="run.id">
             <td>#{{ run.id }}</td>
             <td><span class="chip" :class="run.status === 'completed' ? 'ok' : run.status === 'failed' ? 'fail' : 'chip-gray'">{{ run.status }}</span></td>
             <td>{{ run.step_count }}</td>
             <td>{{ fmtTokens(run.token_input) }}</td>
             <td>{{ fmtTokens(run.token_output) }}</td>
-            <td>{{ run.started_at }}</td>
+            <td>{{ fmtTs(run.started_at) }}</td>
           </tr>
         </tbody>
       </table>

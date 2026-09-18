@@ -77,6 +77,9 @@ onMounted(refresh)
 <template>
   <div>
     <h2>Agent 运行轨迹</h2>
+    <p class="hint" style="margin-top: -8px">
+      每一步都由模型自主决策：调用哪个工具、调用几次、何时停止 —— 这是「工具调用顺序由 LLM 决定」的直接证据。
+    </p>
     <div v-if="error" class="error">{{ error }}</div>
 
     <div class="card">
