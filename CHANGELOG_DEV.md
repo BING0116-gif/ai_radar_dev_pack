@@ -114,3 +114,12 @@
   - 评分信号：`attach_signals` 附加 `keyword_match` / `source_quality`（小型已知域名表 + 0.7 默认）/ `freshness`（按发布时间 7 天衰减，未知 0.5）。
 - `web_search` 工具：可选 `keywords` 参数；返回前做**批内去重 + 附加信号**（廉价预处理），不约束 LLM 后续决策。
 - 测试：`tests/test_dedup.py` 10 个用例（URL/标题去重、归一化、历史重复识别、评分信号、web_search 去重、Agent 顺序不受影响）。全量 104 passed。
+
+### CARD-014 — Scheduler & Notification
+
+- 新增 `app/tools/notify.py`：`Notifier` 协议 + `ConsoleNotifier`（必做）+ `EmailNotifier`（SMTP，`EMAIL_*` 配置齐全才启用，凭据仅来自 Settings/环境变量，**永不入库**）；`send_notification` 工具注册进 Registry。
+- 新增 `app/services/runs.py`：`run_agent(user_id)` —— 组装 registry（文件/bash/搜索/fetch/通知）、订阅与近 7 天标题构造 prompt（CARD-010）、guard+tracer 跑 Loop、成功则 `persist_brief`（CARD-012），随后**尽力而为**通知（失败打日志，绝不丢已生成简报）。此为 Scheduler 唯一触发入口。
+- 新增 `app/services/scheduler.py`：APScheduler `BackgroundScheduler`，每日 cron 由 `SCHEDULER_DAILY_HOUR/MINUTE` 配置**每次启动重建**（"重启恢复"由配置即事实成立）；`manual_fire` 支持手工触发。
+- `main.py` 增加 lifespan：仅当 `SCHEDULER_ENABLED=true`（且未设 `DISABLE_SCHEDULER`）启动，测试环境默认不受影响。
+- Settings 新增 `SCHEDULER_*` 与 `EMAIL_*` 字段，`.env.example` 同步；依赖新增 `apscheduler`。
+- 测试：`test_runs.py` 4 个用例（成功持久化+通知、通知失败不丢简报、未知 channel 保简报、近 7 天标题）+ `test_notify.py` 4 个用例 + `test_scheduler.py` 3 个用例（配置构建+手工触发、重启重建、start/shutdown）。全量 115 passed。

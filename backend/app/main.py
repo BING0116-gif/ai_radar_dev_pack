@@ -1,9 +1,13 @@
 """AI Radar backend entrypoint.
 
-FastAPI application exposing a minimal health check endpoint.
-Settings and structured logging are initialized here so that startup
-validation happens as early as possible.
+FastAPI application exposing the health check and API routers. Settings and
+structured logging are initialized here so startup validation happens early.
+The daily scheduler starts on startup only when ``SCHEDULER_ENABLED=true``
+(set ``DISABLE_SCHEDULER=1`` to suppress, e.g. in test environments).
 """
+
+import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -18,7 +22,25 @@ settings = get_settings()
 setup_logging()
 logger = get_logger("main")
 
-app = FastAPI(title="AI Radar API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    scheduler = None
+    if settings.SCHEDULER_ENABLED and os.environ.get("DISABLE_SCHEDULER") != "1":
+        from app.services.scheduler import build_scheduler
+
+        scheduler = build_scheduler()
+        scheduler.start()
+        logger.info("daily scheduler started (hour=%s minute=%s)",
+                    settings.SCHEDULER_DAILY_HOUR, settings.SCHEDULER_DAILY_MINUTE)
+    try:
+        yield
+    finally:
+        if scheduler is not None:
+            scheduler.shutdown(wait=False)
+
+
+app = FastAPI(title="AI Radar API", version="0.1.0", lifespan=lifespan)
 
 logger.info("startup app_env=%s version=%s ws=%s", settings.APP_ENV.value, app.version, settings.WORKSPACE_ROOT)
 

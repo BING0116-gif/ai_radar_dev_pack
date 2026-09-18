@@ -49,6 +49,19 @@ class Settings(BaseSettings):
     AGENT_MAX_STEPS: int = Field(default=12, ge=1, le=50)
     TOOL_TIMEOUT_SECONDS: float = Field(default=10.0, gt=0)
 
+    # --- scheduler ---
+    SCHEDULER_ENABLED: bool = False
+    SCHEDULER_DAILY_HOUR: int = Field(default=9, ge=0, le=23)
+    SCHEDULER_DAILY_MINUTE: int = Field(default=0, ge=0, le=59)
+
+    # --- notifications (credentials come from env only, never the DB) ---
+    EMAIL_HOST: str = ""
+    EMAIL_PORT: int = 465
+    EMAIL_USER: str = ""
+    EMAIL_PASSWORD: SecretStr = SecretStr("")
+    EMAIL_FROM: str = ""
+    EMAIL_TO: str = ""
+
     @field_validator("WORKSPACE_ROOT", mode="after")
     @classmethod
     def make_workspace_root_absolute(cls, value: Path) -> Path:
