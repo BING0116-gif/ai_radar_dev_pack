@@ -162,8 +162,8 @@ def test_external_cancel(registry):
 # --- CARD-010: final-output guard & one-shot repair ---------------------------
 
 VALID_BRIEF = (
-    '{"title":"T","date":"2026-09-17","items":['
-    '{"title":"n","summary":"s","reason":"r","source_url":"https://example.com/x"}]}'
+    '{"brief_date":"2026-09-17","intro":"hi","items":['
+    '{"title":"n","summary":"s","source_url":"https://example.com/x"}]}'
 )
 
 
@@ -173,7 +173,7 @@ def test_final_valid_json_passes_guard(registry):
     result = loop.run(AgentContext(task="t"))
     assert result.stop_reason == "final_response"
     assert result.structured is not None
-    assert result.structured["title"] == "T"
+    assert result.structured["brief_date"] == "2026-09-17"
 
 
 def test_final_invalid_json_repaired_once(registry):

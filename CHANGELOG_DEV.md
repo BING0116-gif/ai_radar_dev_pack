@@ -99,3 +99,9 @@
 - loop 集成（不侵入工具）：新增 `AgentTracer` Protocol + `NoopTracer` 默认；`run()` 异常统一走 `on_run_error` 再重抛；所有返回路径经 `_done`。
 - Privacy：只存截断 preview（错误 800 字符/输出 500 字符），不落 API Key；测试以环境 key 断言不泄漏。
 - 测试：`tests/test_tracing.py` 6 个用例（成功 run 全事件落库、run 唯一 ID、每个 tool call 有 step、工具失败 trace、错误 run→failed+run_error、无 key 泄漏）。全量 89 passed。
+
+### CARD-012 — Brief Persistence
+
+- **Brief 结构定稿**（`guardrails.py` 演进）：item = `title/summary/why_it_matters/source_name/source_url/published_at/topics`；brief = `brief_date/intro/items/generated_at`；`REPAIR_INSTRUCTION` 同步更新；010 相关测试同步调整。
+- 新增 `app/services/briefs.py`：`clean_and_limit_items`（剔除无 http(s) URL 的 item，再按 `max_items` 截断）、`render_markdown`、`persist_brief`（落 `briefs` 表 + 写 `workspace/briefs/YYYY-MM-DD-<run_id>.md`，锚定 `WORKSPACE_ROOT`，自动建目录）。
+- 测试：`tests/test_briefs.py` 5 个用例（final 可解析成 Brief schema、DB 与 Markdown 双写一致、无 URL item 剔除、max_items 生效）。全量 94 passed。

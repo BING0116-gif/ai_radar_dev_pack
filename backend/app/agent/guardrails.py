@@ -16,24 +16,28 @@ from pydantic import AnyHttpUrl, BaseModel, Field, ValidationError
 REPAIR_INSTRUCTION = (
     "你上一轮的输出不符合要求的 JSON 结构。"
     "请只输出一个 JSON 对象（不要任何解释文字），结构为："
-    '{{"title": 简报标题, "date": "YYYY-MM-DD", "items": [{{"title": 标题, "summary": 摘要, '
-    '"reason": 推荐理由, "source_url": 来源链接, "published_at": 发布时间或 null}}]}}。'
-    "每条新闻的 source_url 必须是有效 http(s) 链接。错误信息：{error}"
+    '{{"brief_date": "YYYY-MM-DD", "intro": 引言, "items": [{{"title": 标题, "summary": 摘要, '
+    '"why_it_matters": 为什么重要, "source_name": 来源名称, "source_url": 来源链接, '
+    '"published_at": 发布时间或 null, "topics": [标签数组]}}], "generated_at": ""}}。'
+    "每条新闻的 source_url 必须是有效 http(s) 链接，且必须有 title 和 summary。错误信息：{error}"
 )
 
 
 class BriefItem(BaseModel):
     title: str = Field(min_length=1)
     summary: str = Field(min_length=1)
-    reason: str = ""
+    why_it_matters: str = ""
+    source_name: str = ""
     source_url: AnyHttpUrl
     published_at: str | None = None
+    topics: list[str] = Field(default_factory=list)
 
 
 class BriefSchema(BaseModel):
-    title: str = Field(min_length=1)
-    date: str
+    brief_date: str
+    intro: str = ""
     items: list[BriefItem] = Field(min_length=1, max_length=30)
+    generated_at: str = ""
 
 
 def extract_json(text: str) -> dict[str, Any] | None:
