@@ -15,15 +15,16 @@ The scheduler, news providers and filesystem tools never decide call order.
 
 import json
 import logging
+import time
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, Protocol
 
 from app.agent.context import AgentContext
 from app.agent.guardrails import REPAIR_INSTRUCTION, ValidationResult
 from app.agent.prompts import DEFAULT_SYSTEM_PROMPT, wrap_external_content
 from app.agent.registry import ToolRegistry
 from app.core.config import get_settings
-from app.core.llm_client import LLMClient
+from app.core.llm_client import LLMClient, LLMResponse
 
 logger = logging.getLogger("app.agent.loop")
 
@@ -50,6 +51,34 @@ class AgentRunResult:
     structured: dict[str, Any] | None = None  # schema-validated output when a guard is used
 
 
+class AgentTracer(Protocol):
+    """Observer hook for the loop's runtime events (implementations persist them)."""
+
+    def on_llm_turn(self, response: LLMResponse, step_no: int) -> None: ...
+
+    def on_tool_call(self, name: str, arguments: dict[str, Any]) -> None: ...
+
+    def on_tool_result(self, name: str, success: bool, preview: str, duration_ms: int) -> None: ...
+
+    def on_finish(self, result: AgentRunResult) -> None: ...
+
+    def on_run_error(self, exc: BaseException) -> None: ...
+
+
+class NoopTracer:
+    """Default tracer that records nothing (keeps the loop DB-free by default)."""
+
+    def on_llm_turn(self, response, step_no): ...
+
+    def on_tool_call(self, name, arguments): ...
+
+    def on_tool_result(self, name, success, preview, duration_ms): ...
+
+    def on_finish(self, result): ...
+
+    def on_run_error(self, exc): ...
+
+
 class AgentLoop:
     """Generic function-calling loop; the ordering is decided by the LLM."""
 
@@ -61,18 +90,33 @@ class AgentLoop:
         max_steps: int | None = None,
         repeat_threshold: int = REPEAT_THRESHOLD,
         output_guard: "OutputGuard | None" = None,
+        tracer: AgentTracer | NoopTracer = NoopTracer(),
     ):
         self.registry = registry
         self.llm = llm
         self.max_steps = max_steps or int(get_settings().AGENT_MAX_STEPS)
         self.repeat_threshold = repeat_threshold
         self.output_guard = output_guard
+        self.tracer: AgentTracer | NoopTracer = tracer
 
     def run(
         self,
         context: AgentContext,
         system_prompt: str = DEFAULT_SYSTEM_PROMPT,
         should_stop: Callable[[], bool] | None = None,
+    ) -> AgentRunResult:
+        """Run the loop; returns a result, records tracing, and re-raises errors."""
+        try:
+            return self._run_inner(context, system_prompt, should_stop)
+        except Exception as exc:
+            self.tracer.on_run_error(exc)
+            raise
+
+    def _run_inner(
+        self,
+        context: AgentContext,
+        system_prompt: str,
+        should_stop: Callable[[], bool] | None,
     ) -> AgentRunResult:
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": system_prompt},
@@ -86,12 +130,15 @@ class AgentLoop:
         for step in range(1, self.max_steps + 1):
             if should_stop is not None and should_stop():
                 logger.info("agent run cancelled at step %s", step)
-                return AgentRunResult(stop_reason="cancelled", step_count=step - 1, calls=calls)
+                return self._done(
+                    AgentRunResult(stop_reason="cancelled", step_count=step - 1, calls=calls)
+                )
 
             response = self.llm.chat(messages, tools)
+            self.tracer.on_llm_turn(response, step)
 
             if not response.tool_calls:  # final answer (+ optional schema guard)
-                return self._finish(response, messages, tools, step, calls)
+                return self._done(self._finish(response, messages, tools, step, calls))
 
             signature = tuple(
                 (tc.name, _canonical_args(tc.arguments)) for tc in response.tool_calls
@@ -99,13 +146,19 @@ class AgentLoop:
             repeat_streak = repeat_streak + 1 if signature == previous_call_signature else 1
             if repeat_streak > self.repeat_threshold:
                 logger.warning("agent stopped: repeated tool call %s", signature)
-                return AgentRunResult(stop_reason="repeated_call", step_count=step, calls=calls)
+                return self._done(
+                    AgentRunResult(stop_reason="repeated_call", step_count=step, calls=calls)
+                )
             previous_call_signature = signature
 
             messages.append(_assistant_tool_message(response))
             for tc in response.tool_calls:
+                self.tracer.on_tool_call(tc.name, tc.arguments)
+                started = time.monotonic()
                 result = self.registry.execute(tc.name, tc.arguments)
+                duration_ms = int((time.monotonic() - started) * 1000)
                 preview = _preview(result.data if result.success else result.error)
+                self.tracer.on_tool_result(tc.name, result.success, preview, duration_ms)
                 calls.append(ToolCallRecord(
                     name=tc.name, arguments=tc.arguments, success=result.success, output_preview=preview,
                 ))
@@ -123,7 +176,14 @@ class AgentLoop:
                 })
                 logger.info("step %s tool=%s success=%s", step, tc.name, result.success)
 
-        return AgentRunResult(stop_reason="max_steps", step_count=self.max_steps, calls=calls)
+        return self._done(
+            AgentRunResult(stop_reason="max_steps", step_count=self.max_steps, calls=calls)
+        )
+
+    def _done(self, result: AgentRunResult) -> AgentRunResult:
+        """Notify the tracer and return the result unchanged."""
+        self.tracer.on_finish(result)
+        return result
 
     def _finish(self, response, messages, tools, step, calls) -> AgentRunResult:
         """Handle a final (no-tool-call) reply; validate & repair once if guarded."""

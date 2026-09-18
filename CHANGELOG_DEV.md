@@ -90,3 +90,12 @@
 - loop 集成：工具 observation 统一经 `wrap_external_content` 包裹；最终输出挂 guard 校验，**恰好一次修复轮**（重新要求输出合法 JSON），新增 stop_reason `repaired`/`invalid_output` 与 `structured` 字段。
 - 修复：`REPAIR_INSTRUCTION` 中 JSON 花括号转义（`.format()` 冲突实测发现）。
 - 测试：`test_prompts.py` 4 个用例 + `test_guardrails.py` 7 个用例 + `test_agent_loop.py` 新增 3 个修复机制用例。全量 83 passed。
+
+### CARD-011 — Tracing
+
+- 新增 `app/services/tracing.py`：`DbTracer` 实现 loop 的 `AgentTracer` 协议 —— run 创建即 `running`，每个事件写一行 `agent_steps`。
+- 事件类型：`run_start` / `llm_turn` / `tool_call` / `tool_result` / `run_finish` / `run_error`；记录 step_no、event_type、tool_name、tool_input_json、tool_output_preview、duration_ms、success。
+- `agent_runs` 状态机：final/repaired/max_steps/repeated_call → `completed`；cancelled → `aborted`；异常 → `failed`（含 `error_message`）后由 loop 重抛；`step_count` 与 trace 行数实时同步。
+- loop 集成（不侵入工具）：新增 `AgentTracer` Protocol + `NoopTracer` 默认；`run()` 异常统一走 `on_run_error` 再重抛；所有返回路径经 `_done`。
+- Privacy：只存截断 preview（错误 800 字符/输出 500 字符），不落 API Key；测试以环境 key 断言不泄漏。
+- 测试：`tests/test_tracing.py` 6 个用例（成功 run 全事件落库、run 唯一 ID、每个 tool call 有 step、工具失败 trace、错误 run→failed+run_error、无 key 泄漏）。全量 89 passed。
