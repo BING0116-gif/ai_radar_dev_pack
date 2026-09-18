@@ -15,7 +15,7 @@ from app.agent.context import AgentContext
 from app.agent.guardrails import BriefOutputGuard
 from app.agent.loop import AgentLoop
 from app.agent.registry import ToolRegistry
-from app.agent.prompts import build_system_prompt
+from app.agent.prompts import build_chat_system_prompt, build_system_prompt
 from app.core.config import get_settings
 from app.core.llm_client import LLMClient, OpenAICompatibleClient
 from app.models import Brief, Subscription, User
@@ -75,8 +75,15 @@ def run_agent(
     notifiers: dict[str, Notifier] | None = None,
     root: Path | None = None,
     reason: str = "manual",
+    task: str | None = None,
+    mode: str = "brief",
 ) -> dict:
-    """Run one full agent task for a user; persist brief; notify best-effort."""
+    """Run one full agent task for a user.
+
+    mode="brief": the standard daily-brief flow (schema-guarded, persisted,
+    notified). mode="chat": free-form task answered by the same model-driven
+    loop (no JSON guard, no brief persistence).
+    """
     settings = get_settings()
     user = db.get(User, user_id)
     if user is None:
@@ -85,27 +92,31 @@ def run_agent(
         db.query(Subscription).filter(Subscription.user_id == user_id).order_by(Subscription.id).first()
     )
     max_items = subscription.max_items if subscription else 5
+    user_info = {"name": user.name, "role": user.role, "timezone": user.timezone}
+    sub_info = {
+        "topics": subscription.topics_json if subscription else [],
+        "keywords": subscription.keywords_json if subscription else [],
+        "excluded_keywords": subscription.excluded_keywords_json if subscription else [],
+        "max_items": max_items,
+        "language": subscription.language if subscription else "zh-CN",
+    }
 
-    system_prompt = build_system_prompt(
-        {"name": user.name, "role": user.role, "timezone": user.timezone},
-        {
-            "topics": subscription.topics_json if subscription else [],
-            "keywords": subscription.keywords_json if subscription else [],
-            "excluded_keywords": subscription.excluded_keywords_json if subscription else [],
-            "max_items": max_items,
-            "language": subscription.language if subscription else "zh-CN",
-        },
-        recent_titles=recent_titles(db, user_id),
-    )
+    if mode == "chat":
+        system_prompt = build_chat_system_prompt(user_info, sub_info)
+        guard = None
+        agent_task = task or ""
+    else:
+        system_prompt = build_system_prompt(user_info, sub_info, recent_titles=recent_titles(db, user_id))
+        guard = BriefOutputGuard()
+        agent_task = task or _task_instruction(subscription)
 
     reg = registry if registry is not None else build_default_registry(root)
     tracer = DbTracer(db, user, run_reason=reason)
-    guard = BriefOutputGuard()
 
     # llm defaults to the real OpenAI-compatible client; tests inject mocks.
     llm = llm if llm is not None else OpenAICompatibleClient()
     result = AgentLoop(reg, llm, output_guard=guard, tracer=tracer).run(
-        AgentContext(task=_task_instruction(subscription), extra={"user_id": user_id}),
+        AgentContext(task=agent_task, extra={"user_id": user_id, "mode": mode}),
         system_prompt=system_prompt,
     )
 
@@ -116,9 +127,13 @@ def run_agent(
         "item_count": 0,
         "notification_sent": False,
         "error": None,
+        "content": result.content,
+        "mode": mode,
+        "token_input": tracer.run.token_input,
+        "token_output": tracer.run.token_output,
     }
 
-    if result.stop_reason in SUCCESS_STOP_REASONS and result.structured:
+    if mode != "chat" and result.stop_reason in SUCCESS_STOP_REASONS and result.structured:
         brief = persist_brief(
             db, user_id=user_id, run_id=tracer.run.id,
             structured=result.structured, max_items=max_items, root=root,

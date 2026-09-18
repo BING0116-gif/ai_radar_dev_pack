@@ -184,3 +184,24 @@
 - UI 架构升级：`App.vue` 改为左侧栏布局（品牌 + 简报/历史/运行轨迹/设置 + 响应式）；`Dashboard.vue` 增加 KPI 指标卡（累计简报/运行次数/成功率/最近运行）+ 今日简报大卡内嵌 BriefReader + 运行状态徽标；`Trace.vue` 从表格改为垂直时间线节点流（事件分类圆点/连线/失败高亮）。
 - 执行环境补丁：`docker-compose.yml` 将 `LLM_BASE_URL/LLM_API_KEY/LLM_MODEL` 改为从 shell/系统环境变量注入（`${VAR:-}`），凭据可完全不落 `.env` 文件。
 - 验证：pytest 126 passed（含 items 落库断言）；`npm run build` 通过；Docker 全栈启动后真实 DeepSeek run #1（31 步 trace、5 条简报）经 nginx 全链路实测。
+
+### 功能增强 A1 + E1 — 自由对话模式与 Token 用量统计
+
+**A1 任意自然语言任务（chat 模式）**
+- 后端 `POST /api/runs` 支持可选 body `{task, mode}`：`mode='brief'`（默认，行为不变）或 `mode='chat'`（自由任务）。
+- chat 模式：`build_chat_system_prompt` 复用同一安全边界（`<external_content trust="false">`）与用户偏好，但去掉简报 JSON 约束 —— 模型自决是否调用工具、直接输出纯文本答案；同一模型驱动 Loop（复用，无第二套 Agent），不持久化 Brief。
+- 校验：非法 mode → `42201`；chat 模式缺 task → `42202`。`RunCreated` 新增 `content/mode/token_input/token_output`；兼容无 body 旧调用。
+
+**E1 Token 用量统计**
+- `LLMResponse` 解析 `/chat/completions` 响应的 `usage.prompt_tokens/completion_tokens`（缺失默认 0）。
+- Loop 每轮（含修复轮）调用新 tracer 钩子 `on_usage`；`DbTracer.on_usage` 累加到 `agent_runs.token_input/token_output`（复用既有列，无迁移）。
+- llm_turn 步在 `tool_input` 中记录每轮 `token_input/token_output`，Trace 页模型决策节点直接展示。
+
+**前端**
+- `api.js createRun(payload)` 支持传 body。
+- `Dashboard.vue`：新增「向 Agent 提问」卡片（textarea + 提问按钮，回答按 run 展示 + 该次 token 用量 + 清空按钮）；KPI 新增「累计 tokens」；最近运行表新增「输入/输出 tokens」两列。
+- `Trace.vue`：llm_turn 节点显示「调用工具 N 次 · 输入 X / 输出 Y tokens」。
+
+**验证**
+- 后端新增 6 个用例：llm_client usage 解析 2（含缺失默认 0）、run_api chat 模式 4（chat 返回 content/token 且不落 Brief、空 task 42202、非法 mode 42201、无 body 兼容）。全量 **134 passed**。
+- `npm run build` 通过；Docker 全栈 + 真实 DeepSeek 实测 chat 模式与 token 统计（见下节）。

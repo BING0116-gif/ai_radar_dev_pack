@@ -56,6 +56,8 @@ class AgentTracer(Protocol):
 
     def on_llm_turn(self, response: LLMResponse, step_no: int) -> None: ...
 
+    def on_usage(self, input_tokens: int, output_tokens: int) -> None: ...
+
     def on_tool_call(self, name: str, arguments: dict[str, Any]) -> None: ...
 
     def on_tool_result(self, name: str, success: bool, preview: str, duration_ms: int) -> None: ...
@@ -69,6 +71,8 @@ class NoopTracer:
     """Default tracer that records nothing (keeps the loop DB-free by default)."""
 
     def on_llm_turn(self, response, step_no): ...
+
+    def on_usage(self, input_tokens, output_tokens): ...
 
     def on_tool_call(self, name, arguments): ...
 
@@ -136,6 +140,7 @@ class AgentLoop:
 
             response = self.llm.chat(messages, tools)
             self.tracer.on_llm_turn(response, step)
+            self.tracer.on_usage(response.token_input, response.token_output)
 
             if not response.tool_calls:  # final answer (+ optional schema guard)
                 return self._done(self._finish(response, messages, tools, step, calls))
@@ -201,6 +206,7 @@ class AgentLoop:
         messages.append({"role": "assistant", "content": response.content})
         messages.append({"role": "user", "content": REPAIR_INSTRUCTION.format(error=first.error)})
         repaired = self.llm.chat(messages, tools)
+        self.tracer.on_usage(repaired.token_input, repaired.token_output)
         second = self.output_guard.validate(repaired.content)
         if second.ok:
             return AgentRunResult(stop_reason="repaired", content=repaired.content,

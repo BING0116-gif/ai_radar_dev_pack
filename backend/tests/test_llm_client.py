@@ -47,6 +47,32 @@ def test_parses_tool_calls_and_content():
     assert response.tool_calls[0].arguments == {"query": "ai"}
 
 
+def test_parses_usage_tokens():
+    """Usage from the /chat/completions response lands on the LLMResponse (E1)."""
+    payload = {
+        "choices": [{"message": {"role": "assistant", "content": "hi"}, "finish_reason": "stop"}],
+        "usage": {"prompt_tokens": 123, "completion_tokens": 45},
+    }
+
+    def handler(request):
+        return httpx.Response(200, json=payload, request=request)
+
+    response = _make(handler).chat([{"role": "user", "content": "hi"}], tools=[])
+    assert response.token_input == 123
+    assert response.token_output == 45
+
+
+def test_usage_missing_defaults_to_zero():
+    payload = {"choices": [{"message": {"role": "assistant", "content": "hi"}, "finish_reason": "stop"}]}
+
+    def handler(request):
+        return httpx.Response(200, json=payload, request=request)
+
+    response = _make(handler).chat([{"role": "user", "content": "hi"}], tools=[])
+    assert response.token_input == 0
+    assert response.token_output == 0
+
+
 def test_malformed_arguments_fall_back_to_empty():
     payload = {
         "choices": [{"message": {"tool_calls": [{

@@ -114,3 +114,47 @@ def test_empty_lists_are_unified_ok(client):
     assert runs.status_code == 200 and runs.json()["code"] == 0
     assert briefs.status_code == 200 and briefs.json()["code"] == 0
     assert runs.json()["data"] == [] and briefs.json()["data"] == []
+
+
+# --- A1: free-form chat mode ---
+
+
+def test_chat_mode_returns_content_and_tokens(client, api_llm, patched_run_env):
+    api_llm.responses = [LLMResponse(
+        content="DeepSeek-V3 的最新版主要优化了推理效率与长上下文支持。",
+        finish_reason="stop", token_input=321, token_output=87,
+    )]
+    resp = client.post("/api/runs", json={"task": "DeepSeek 最近更新了什么？", "mode": "chat"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["code"] == 0
+    data = body["data"]
+    assert data["mode"] == "chat"
+    assert data["brief_id"] is None
+    assert "推理效率" in data["content"]
+    assert data["token_input"] == 321
+    assert data["token_output"] == 87
+
+    # chat run must not persist a brief
+    assert client.get("/api/briefs").json()["data"] == []
+
+    # tokens persisted on the run row (E1)
+    run = client.get(f"/api/runs/{data['run_id']}").json()["data"]
+    assert run["token_input"] == 321
+    assert run["token_output"] == 87
+
+
+def test_chat_mode_requires_task(client):
+    resp = client.post("/api/runs", json={"task": "  ", "mode": "chat"})
+    assert resp.status_code == 422
+    assert resp.json()["code"] == 42202
+
+
+def test_invalid_mode_rejected(client):
+    resp = client.post("/api/runs", json={"mode": "video"})
+    assert resp.status_code == 422
+    assert resp.json()["code"] == 42201
+
+
+def test_brief_mode_ignores_missing_body(client, api_llm, patched_run_env):
+    assert client.post("/api/runs").status_code == 200  # legacy no-body call keeps working

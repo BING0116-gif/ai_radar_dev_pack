@@ -12,25 +12,50 @@ from app.api.subscriptions import get_or_create_demo_user
 from app.db import get_db
 from app.models import AgentRun, AgentStep, Brief
 from app.schemas.common import ApiError, ApiResponse, ok
-from app.schemas.run import BriefDetail, BriefSummary, RunCreated, RunSummary, StepResponse
+from app.schemas.run import (
+    BriefDetail,
+    BriefSummary,
+    CreateRunPayload,
+    RunCreated,
+    RunSummary,
+    StepResponse,
+)
 
 router = APIRouter(prefix="/api", tags=["run-brief"])
 
 
 @router.post("/runs", response_model=ApiResponse[RunCreated], status_code=200)
-def create_run(db: Session = Depends(get_db)) -> ApiResponse[RunCreated]:
-    """Immediately start one agent run for the demo user."""
+def create_run(
+    payload: CreateRunPayload | None = None,
+    db: Session = Depends(get_db),
+) -> ApiResponse[RunCreated]:
+    """Start one agent run: brief mode (default) or free-form chat mode."""
     from app.services import runs as runs_service
+
+    body = payload or CreateRunPayload()
+    if body.mode not in ("brief", "chat"):
+        raise ApiError("mode must be 'brief' or 'chat'", code=42201, status_code=422)
+    if body.mode == "chat" and not (body.task or "").strip():
+        raise ApiError("task is required in chat mode", code=42202, status_code=422)
 
     user = get_or_create_demo_user(db)
     db.commit()
     summary = runs_service.run_agent(
-        db, user.id, llm=runs_service.get_default_llm(), reason="manual"
+        db,
+        user.id,
+        llm=runs_service.get_default_llm(),
+        reason="manual",
+        task=body.task,
+        mode=body.mode,
     )
     return ok(RunCreated(
         run_id=summary["run_id"],
         stop_reason=summary["stop_reason"],
         brief_id=summary["brief_id"],
+        content=summary.get("content", ""),
+        mode=summary.get("mode", "brief"),
+        token_input=summary.get("token_input", 0),
+        token_output=summary.get("token_output", 0),
     ))
 
 

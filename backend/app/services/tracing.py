@@ -47,10 +47,19 @@ class DbTracer(AgentTracer):
     def on_llm_turn(self, response: Any, step_no: int) -> None:
         self._log(
             event_type="llm_turn", tool_name=None,
-            tool_input={"tool_calls": len(response.tool_calls)},
+            tool_input={
+                "tool_calls": len(response.tool_calls),
+                "token_input": response.token_input,
+                "token_output": response.token_output,
+            },
             duration_ms=0, success=True,
             preview=(response.content or "")[:PREVIEW_CHARS] or None,
         )
+
+    def on_usage(self, input_tokens: int, output_tokens: int) -> None:
+        self.run.token_input += int(input_tokens or 0)
+        self.run.token_output += int(output_tokens or 0)
+        self.db.commit()
 
     def on_tool_call(self, name: str, arguments: dict[str, Any]) -> None:
         self._log(

@@ -15,6 +15,8 @@ class RunSummary(BaseModel):
     started_at: datetime
     finished_at: datetime | None = None
     error_message: str | None = None
+    token_input: int = 0
+    token_output: int = 0
 
 
 class StepResponse(BaseModel):
@@ -35,6 +37,17 @@ class RunCreated(BaseModel):
     run_id: int
     stop_reason: str
     brief_id: int | None = None
+    content: str = ""
+    mode: str = "brief"
+    token_input: int = 0
+    token_output: int = 0
+
+
+class CreateRunPayload(BaseModel):
+    """Body of POST /api/runs (all optional; brief mode ignores task)."""
+
+    task: str | None = None
+    mode: str = "brief"
 
 
 class BriefSummary(BaseModel):

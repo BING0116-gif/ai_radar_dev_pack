@@ -34,6 +34,15 @@ function inputPreview(step) {
   }
 }
 
+function fmtTokens(n) {
+  return Number(n || 0).toLocaleString()
+}
+
+function turnInfo(step) {
+  const t = step.tool_input || {}
+  return `调用工具 ${t.tool_calls || 0} 次 · 输入 ${fmtTokens(t.token_input)} / 输出 ${fmtTokens(t.token_output)} tokens`
+}
+
 async function refresh() {
   loading.value = true
   error.value = ''
@@ -105,6 +114,7 @@ onMounted(refresh)
               <span v-if="step.duration_ms" class="hint" style="font-size: 12px">{{ step.duration_ms }} ms</span>
             </div>
 
+            <div v-if="step.event_type === 'llm_turn'" class="tl-code">{{ turnInfo(step) }}</div>
             <div v-if="step.event_type === 'tool_call' || step.event_type === 'tool_result'">
               <div v-if="step.tool_name" class="tl-code">工具：{{ step.tool_name }}</div>
               <div v-if="step.tool_input" class="tl-code">{{ inputPreview(step) }}</div>

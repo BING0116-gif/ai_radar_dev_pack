@@ -61,5 +61,27 @@ def build_system_prompt(
     return "\n".join(parts)
 
 
+def build_chat_system_prompt(user: dict[str, Any], subscription: dict[str, Any]) -> str:
+    """System prompt for free-form chat tasks (A1): same safety boundary,
+    same user preferences, but no brief-JSON constraint — the model answers
+    an arbitrary question using the same model-driven tool loop."""
+    parts = [ROLE_LINE, "", UNTRUSTED_BOUNDARY_LINE]
+    parts.append(
+        "- 你需要回答用户提出的任意问题/任务：自己决定是否调用工具（搜索、读网页、查文件）。"
+    )
+    parts.append(
+        "- 信息不足时继续检索；已能给出可靠回答时立即停止并直接输出最终答案（纯文本即可，无需 JSON）。"
+    )
+    parts.append("- 引用来源时给出真实 URL，禁止编造。")
+    parts.append("")
+    parts.append("## 用户信息")
+    parts.append(f"- 名称: {user.get('name', '')}；身份: {user.get('role', '')}；时区: {user.get('timezone', '')}")
+    parts.append("")
+    parts.append("## 订阅偏好")
+    parts.append(f"- 关注主题: {', '.join(subscription.get('topics', [])) or '（无）'}")
+    parts.append(f"- 关键词: {', '.join(subscription.get('keywords', [])) or '（无）'}")
+    return "\n".join(parts)
+
+
 # Baseline when no user/subscription context is available.
 DEFAULT_SYSTEM_PROMPT = build_system_prompt({}, {})

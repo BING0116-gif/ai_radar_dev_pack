@@ -44,6 +44,8 @@ class LLMResponse:
     content: str = ""
     tool_calls: list[ToolCall] = field(default_factory=list)
     finish_reason: str | None = None
+    token_input: int = 0
+    token_output: int = 0
 
 
 class LLMClient(Protocol):
@@ -104,6 +106,7 @@ class OpenAICompatibleClient:
     def _parse(payload: dict[str, Any]) -> LLMResponse:
         choice = payload["choices"][0]
         message = choice.get("message", {})
+        usage = payload.get("usage") or {}
         tool_calls: list[ToolCall] = []
         for raw in message.get("tool_calls") or []:
             fn = raw.get("function", {})
@@ -121,4 +124,6 @@ class OpenAICompatibleClient:
             content=message.get("content") or "",
             tool_calls=tool_calls,
             finish_reason=choice.get("finish_reason"),
+            token_input=int(usage.get("prompt_tokens") or 0),
+            token_output=int(usage.get("completion_tokens") or 0),
         )

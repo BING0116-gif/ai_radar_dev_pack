@@ -49,6 +49,6 @@ export function getBrief(briefId) {
   return request(`/api/briefs/${briefId}`)
 }
 
-export function createRun() {
-  return request('/api/runs', { method: 'POST' })
+export function createRun(payload = {}) {
+  return request('/api/runs', { method: 'POST', body: JSON.stringify(payload) })
 }
