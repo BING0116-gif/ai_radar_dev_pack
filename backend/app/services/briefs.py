@@ -75,6 +75,7 @@ def persist_brief(
         title=f"AI 新闻简报 {brief_date}",
         content_markdown=markdown,
         item_count=len(items),
+        items_json=items,
     )
     db.add(brief)
     db.commit()

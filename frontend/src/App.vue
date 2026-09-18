@@ -6,28 +6,36 @@ import Settings from './views/Settings.vue'
 import Trace from './views/Trace.vue'
 
 const activeTab = ref('dashboard')
+
+const NAVS = [
+  { key: 'dashboard', label: '简报' },
+  { key: 'history', label: '历史' },
+  { key: 'trace', label: '运行轨迹' },
+  { key: 'settings', label: '设置' },
+]
 </script>
 
 <template>
-  <div class="app">
-    <header class="topbar">
-      <span class="brand">AI Radar</span>
-      <nav>
-        <button :class="{ active: activeTab === 'dashboard' }" @click="activeTab = 'dashboard'">
-          Dashboard
-        </button>
-        <button :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'">
-          历史简报
-        </button>
-        <button :class="{ active: activeTab === 'trace' }" @click="activeTab = 'trace'">
-          运行轨迹
-        </button>
-        <button :class="{ active: activeTab === 'settings' }" @click="activeTab = 'settings'">
-          设置
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        AI Radar
+      </div>
+      <nav class="side-nav">
+        <button
+          v-for="nav in NAVS"
+          :key="nav.key"
+          :class="{ active: activeTab === nav.key }"
+          @click="activeTab = nav.key"
+        >
+          <span class="nav-label">{{ nav.label }}</span>
         </button>
       </nav>
-    </header>
-    <main>
+      <div class="side-foot hint">A model-driven news agent</div>
+    </aside>
+
+    <main class="main">
       <Dashboard v-if="activeTab === 'dashboard'" />
       <History v-else-if="activeTab === 'history'" />
       <Trace v-else-if="activeTab === 'trace'" />
@@ -58,41 +66,81 @@ body {
   font-family: system-ui, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
-.app {
-  max-width: 980px;
-  margin: 0 auto;
-  padding: 0 20px 60px;
+.layout {
+  display: flex;
+  min-height: 100vh;
 }
 
-.topbar {
+.sidebar {
+  width: 210px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: #fdfbf7;
+  padding: 24px 14px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 0;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 24px;
+  flex-direction: column;
+  gap: 22px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
 }
 
 .brand {
-  font-size: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 19px;
   font-weight: 700;
   letter-spacing: 0.5px;
+  padding: 0 6px;
 }
 
-nav button {
+.brand-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--pine);
+}
+
+.side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.side-nav button {
   border: none;
   background: transparent;
   color: var(--muted);
-  font-size: 15px;
-  padding: 8px 14px;
+  font-size: 14.5px;
+  text-align: left;
+  padding: 9px 12px;
   border-radius: 8px;
   cursor: pointer;
 }
 
-nav button.active {
+.side-nav button:hover {
+  background: #f4efe6;
+}
+
+.side-nav button.active {
   background: #eef3ef;
   color: var(--pine);
   font-weight: 600;
+}
+
+.side-foot {
+  margin-top: auto;
+  font-size: 12px;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 28px 60px;
+  width: 100%;
 }
 
 h2 {
@@ -222,12 +270,68 @@ textarea {
   background: #eef3ef;
 }
 
-.md {
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  margin: 0;
+/* KPI 指标卡 */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.kpi {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.kpi-value {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.kpi-last {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.kpi-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* 状态徽标 */
+.chip {
+  display: inline-block;
+  font-size: 12px;
+  border-radius: 6px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.chip-gray { background: #f1eee8; color: #6b6b6b; }
+.ok { background: #eef3ef; color: #3e6b5a; font-weight: 600; }
+.fail { background: #fdf0ef; color: #b0413e; font-weight: 600; }
+
+@media (max-width: 760px) {
+  .layout {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    height: auto;
+    position: static;
+    flex-direction: row;
+    align-items: center;
+  }
+  .side-nav {
+    flex-direction: row;
+  }
+  .kpi-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 </style>

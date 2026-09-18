@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 
-from sqlalchemy import Date, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Date, ForeignKey, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, utcnow
@@ -19,6 +19,7 @@ class Brief(Base):
     title: Mapped[str] = mapped_column(String(200), default="")
     content_markdown: Mapped[str] = mapped_column(Text, default="")
     item_count: Mapped[int] = mapped_column(Integer, default=0)
+    items_json: Mapped[list] = mapped_column(JSON, default=list, server_default=text("'[]'"))
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
     user: Mapped["User"] = relationship()

@@ -50,3 +50,6 @@ class BriefSummary(BaseModel):
 
 class BriefDetail(BriefSummary):
     content_markdown: str = ""
+    items: list[Any] = Field(
+        default_factory=list, validation_alias=AliasChoices("items_json", "items")
+    )

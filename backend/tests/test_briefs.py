@@ -1,6 +1,7 @@
 """Tests for brief persistence: schema parse, DB + file save (CARD-012)."""
 
 import json
+from datetime import date
 
 from app.agent.guardrails import BriefOutputGuard
 from app.models import AgentRun, Brief, User
@@ -60,6 +61,9 @@ def test_persist_brief_saves_db_and_markdown(db_session, tmp_path):
     assert saved.item_count == 2
     assert "今日要点" in saved.content_markdown
     assert "https://a.example.com/1" in saved.content_markdown
+    # structured items persisted alongside the markdown
+    assert saved.items_json[0]["title"] == "t1"
+    assert saved.items_json[0]["source_url"] == "https://a.example.com/1"
 
     # workspace markdown file at workspace/briefs/YYYY-MM-DD-<run_id>.md
     expected = tmp_path / "briefs" / f"2026-09-17-{run.id}.md"
@@ -80,6 +84,40 @@ def test_persist_respects_max_items(db_session, tmp_path):
     brief = persist_brief(db_session, user_id=user.id, run_id=run.id,
                           structured=source, max_items=2, root=tmp_path)
     assert db_session.get(Brief, brief.id).item_count == 2
+
+
+def test_brief_detail_schema_exposes_items(db_session, tmp_path):
+    """The API envelope field maps the ORM items_json back to structured items."""
+    from app.schemas.run import BriefDetail
+
+    user = _make_user(db_session)
+    run = AgentRun(user_id=user.id, status="completed")
+    db_session.add(run)
+    db_session.commit()
+
+    brief = persist_brief(
+        db_session, user_id=user.id, run_id=run.id,
+        structured=VALID_STRUCTURED, max_items=10, root=tmp_path,
+    )
+    detail = BriefDetail.model_validate(db_session.get(Brief, brief.id))
+    assert len(detail.items) == 2
+    assert detail.items[0]["source_url"] == "https://a.example.com/1"
+
+
+def test_brief_detail_schema_legacy_empty_items(db_session):
+    """Old briefs without items still serialize with an empty list."""
+    from app.schemas.run import BriefDetail
+
+    user = _make_user(db_session)
+    run = AgentRun(user_id=user.id, status="completed")
+    db_session.add(run)
+    db_session.commit()
+    brief = Brief(user_id=user.id, run_id=run.id, brief_date=date.today())
+    db_session.add(brief)
+    db_session.commit()
+
+    detail = BriefDetail.model_validate(db_session.get(Brief, brief.id))
+    assert detail.items == []
 
 
 def _make_user(db_session) -> User:

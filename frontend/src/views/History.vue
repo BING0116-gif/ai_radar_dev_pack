@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import * as api from '../api'
+import BriefReader from '../components/BriefReader.vue'
 
 const briefs = ref([])
 const loading = ref(true)
@@ -76,7 +77,7 @@ onMounted(refresh)
       <div class="hint" style="margin-bottom: 12px">
         {{ detail.brief_date }} · {{ detail.item_count }} 条 · run #{{ detail.run_id }}
       </div>
-      <pre class="md">{{ detail.content_markdown }}</pre>
+      <BriefReader :brief="detail" />
     </div>
   </div>
 </template>

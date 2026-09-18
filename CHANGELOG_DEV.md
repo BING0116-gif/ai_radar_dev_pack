@@ -174,3 +174,13 @@
 - 新增 `docs/DEMO_SCRIPT.md`：3 分钟分段时间线（0:00–3:00）＋ 备用录屏方案 ＋ 防追问要点。
 - 新增 `docs/INTERVIEW_QA.md`：10 道必会问答速答（固定 workflow/LangChain/防死循环/bash 限制/prompt injection/去重/单 Agent/多 Agent 拆分/token 成本/生产化改动）。
 - commit 历史核对：19 个 commit 一卡一提交、Conventional Commits、无 `.env`/密钥入库。
+
+## 2026-09-18
+
+### UI/UX 增强 — 简报可读性与信息架构升级
+
+- 后端：`Brief` 表新增 `items_json` 列（JSON，`server_default="'[]'"`）+ 迁移 `ca0d6e3b015f`；`persist_brief` 将结构化 items 落库；`GET /api/briefs/{id}` 返回 `items`（通过 `BriefDetail`，旧数据 `items=[]` 兼容）。
+- 前端：新增 `components/BriefReader.vue` —— 简报正文优先渲染结构化 items 为新闻卡片（标题/来源徽标/发布时间/主题标签/摘要/「为什么重要」高亮块/阅读原文），旧数据（无 items）回退 markdown-it 渲染（`html:false` + 默认链接协议校验，防注入）。
+- UI 架构升级：`App.vue` 改为左侧栏布局（品牌 + 简报/历史/运行轨迹/设置 + 响应式）；`Dashboard.vue` 增加 KPI 指标卡（累计简报/运行次数/成功率/最近运行）+ 今日简报大卡内嵌 BriefReader + 运行状态徽标；`Trace.vue` 从表格改为垂直时间线节点流（事件分类圆点/连线/失败高亮）。
+- 执行环境补丁：`docker-compose.yml` 将 `LLM_BASE_URL/LLM_API_KEY/LLM_MODEL` 改为从 shell/系统环境变量注入（`${VAR:-}`），凭据可完全不落 `.env` 文件。
+- 验证：pytest 126 passed（含 items 落库断言）；`npm run build` 通过；Docker 全栈启动后真实 DeepSeek run #1（31 步 trace、5 条简报）经 nginx 全链路实测。
