@@ -105,3 +105,12 @@
 - **Brief 结构定稿**（`guardrails.py` 演进）：item = `title/summary/why_it_matters/source_name/source_url/published_at/topics`；brief = `brief_date/intro/items/generated_at`；`REPAIR_INSTRUCTION` 同步更新；010 相关测试同步调整。
 - 新增 `app/services/briefs.py`：`clean_and_limit_items`（剔除无 http(s) URL 的 item，再按 `max_items` 截断）、`render_markdown`、`persist_brief`（落 `briefs` 表 + 写 `workspace/briefs/YYYY-MM-DD-<run_id>.md`，锚定 `WORKSPACE_ROOT`，自动建目录）。
 - 测试：`tests/test_briefs.py` 5 个用例（final 可解析成 Brief schema、DB 与 Markdown 双写一致、无 URL item 剔除、max_items 生效）。全量 94 passed。
+
+### CARD-013 — Dedup & Ranking
+
+- 新增 `app/news/dedup.py`（纯函数，无 ML/网络、不决策 Agent 下一步）：
+  - 去重：`normalize_url`（小写 host / 去 query+fragment / 去尾斜杠）、`normalize_title`（标点与大小写不敏感）、`dedupe_items`（批内 URL + 标题相似度 ≥0.9）；
+  - 历史：`extract_history_entries`（从自渲染 brief markdown 反解析 (url,title)）、`filter_against_history`（近 7 天重复识别）；
+  - 评分信号：`attach_signals` 附加 `keyword_match` / `source_quality`（小型已知域名表 + 0.7 默认）/ `freshness`（按发布时间 7 天衰减，未知 0.5）。
+- `web_search` 工具：可选 `keywords` 参数；返回前做**批内去重 + 附加信号**（廉价预处理），不约束 LLM 后续决策。
+- 测试：`tests/test_dedup.py` 10 个用例（URL/标题去重、归一化、历史重复识别、评分信号、web_search 去重、Agent 顺序不受影响）。全量 104 passed。

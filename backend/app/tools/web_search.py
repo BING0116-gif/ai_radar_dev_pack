@@ -1,10 +1,16 @@
-"""web_search agent tool: query pluggable news providers, fall back on failure."""
+"""web_search agent tool: query pluggable news providers, fall back on failure.
+
+Results are cheaply pre-processed (in-batch dedup + scoring signals) before
+being handed to the model, but the tool never decides what the agent does
+next — that remains the LLM's call.
+"""
 
 from dataclasses import asdict
 
 from pydantic import BaseModel, Field
 
 from app.agent.registry import ToolDefinition, ToolRegistry
+from app.news.dedup import attach_signals, dedupe_items
 from app.news.providers import ProviderError, SearchProvider, build_default_providers
 
 
@@ -12,6 +18,10 @@ class WebSearchParams(BaseModel):
     query: str = Field(description="search query, e.g. 'Claude Code'")
     limit: int = Field(default=5, ge=1, le=20, description="max items")
     provider: str = Field(default="auto", description="auto | google_news | hacker_news")
+    keywords: list[str] = Field(
+        default_factory=list,
+        description="optional user keywords used to compute the keyword_match signal",
+    )
 
 
 class WebSearchTool:
@@ -20,7 +30,8 @@ class WebSearchTool:
     def __init__(self, providers: list[SearchProvider]):
         self._providers = providers
 
-    def web_search(self, query: str, limit: int = 5, provider: str = "auto") -> dict:
+    def web_search(self, query: str, limit: int = 5, provider: str = "auto",
+                   keywords: list[str] | None = None) -> dict:
         pool = self._select(provider)
         last_error: str | None = None
         for prov in pool:
@@ -30,10 +41,13 @@ class WebSearchTool:
                 last_error = str(exc)
                 continue  # try the next provider
             if items:
+                dicts = [asdict(item) for item in items]
+                kept, _dropped = dedupe_items(dicts)
+                payload = [attach_signals(item, keywords) for item in kept]
                 return {
                     "query": query,
                     "provider": prov.name,
-                    "items": [asdict(item) for item in items],
+                    "items": payload,
                 }
         raise ProviderError(f"all search providers failed: {last_error or 'no results'}")
 
