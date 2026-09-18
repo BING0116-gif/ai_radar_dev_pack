@@ -82,3 +82,11 @@ def test_zero_and_too_small_max_items_rejected(client):
 def test_response_format_is_unified(client):
     resp = client.get("/api/subscription")
     assert UNIFIED_KEYS == set(resp.json().keys())
+
+
+def test_role_is_persisted(client):
+    resp = client.put("/api/subscription", json=_subscription_payload(role="AI Researcher"))
+    assert resp.status_code == 200
+    assert resp.json()["data"]["role"] == "AI Researcher"
+    read = client.get("/api/subscription")
+    assert read.json()["data"]["role"] == "AI Researcher"

@@ -60,6 +60,8 @@ def update_subscription(
     user = get_or_create_demo_user(db)
     if payload.timezone:
         user.timezone = payload.timezone
+    if payload.role is not None:
+        user.role = payload.role.strip()
 
     sub = _get_or_none(db, user)
     if sub is None:

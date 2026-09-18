@@ -28,6 +28,7 @@ class SubscriptionUpdate(BaseModel):
     notification_channel: str = "none"
     enabled: bool = True
     timezone: str = "Asia/Shanghai"
+    role: str | None = None  # optional identity change on the demo user
 
     @field_validator("topics", "keywords", "excluded_keywords")
     @classmethod

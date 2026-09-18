@@ -133,3 +133,12 @@
 - 敏感输出防护：steps 只返回截断 preview（≤500 字符，测试含 900 字符 snippet 断言）。
 - `.gitignore` 增加 `workspace/briefs/`（生成产物）。
 - 测试：`tests/test_run_api.py` 5 个用例（POST→读 run/brief/steps 全链路、run/brief 统一 404、输出不暴露、空列表统一信封；llm 与 workspace 均注入，不触真实 LLM/网络）。全量 120 passed。Gate D 达成（前后端可联通）。
+
+### CARD-016 — Dashboard & Settings UI
+
+- 前端 `/api` 代理（vite dev → `127.0.0.1:8000`），避免 CORS；`src/api.js` 封装统一信封 `{code,message,data}`，错误统一抛 Error（**无任何 mock**）。
+- `src/views/Dashboard.vue`：今日简报（最近一期 title/item_count/date）+ 最近运行表 + 「立即生成」（POST /api/runs，loading 禁用、失败错误横幅、完成后刷新）。
+- `src/views/Settings.vue`：role / topics / keywords / excluded_keywords（逗号或换行分隔、去空白去空）/ max_items（1–20）/ language / notification_channel，保存 PUT /api/subscription（含保存中与「已保存」提示）。
+- `src/App.vue` 重写为顶栏 Tab 壳（Dashboard | 设置），无 router（不引入新依赖）；样式遵循偏好：暖米白底、墨色文字、松绿主色、圆角、无特效。
+- 后端小扩展：`SubscriptionUpdate.role`（可选）→ PUT 时更新 `user.role`；`test_subscription_api` 新增 role 持久化用例。
+- 验证：`npm run build` 通过（13 modules）；`npm run dev` 启动后首页 200；后端全量 121 passed。Gate D 完成（前端真实联通后端）。
