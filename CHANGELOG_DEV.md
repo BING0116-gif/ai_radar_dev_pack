@@ -150,3 +150,11 @@
 - `src/api.js` 新增 `getBrief(id)` / `getRunSteps(runId)`；`App.vue` 增「历史简报」「运行轨迹」两个 Tab。
 - 敏感防护：仅展示 API 已截断的 preview；无密钥相关字段；模型内容以纯文本渲染。
 - 验证：`npm run build` 通过；真实 API 驱动（无 mock）。
+
+### CARD-018 — Tests & Evals
+
+- 新增 `tests/test_integration_agent.py`（Mock LLM，零网络）：search→fetch→write→final 全链路 —— 断言 trace 行含三类工具、fetch 结果 preview 落 trace、write 真实落盘、brief 持久化；历史简报标题注入 prompt（去重提示触达模型）。
+- 新增 `app/services/eval.py`：5 个固定画像（Agent Developer/Researcher/Founder/Student/PM）；`MockBriefLLM` 确定性产出含批次内重复与历史重复的简报；指标从**持久化 markdown 反解析**计算：成功率先验、平均 steps、相关性（keyword_match 归一）、批次重复率、来源完整率；输出 `EvalSummary.short_report()`。
+- 新增 `tests/test_eval.py`：指标纯函数 + 5 画像全流程 eval（成功率先验 1.0、dup>0、source=1.0、报告内容断言）。
+- **修复**：`run_agent` 此前构建了定制 system_prompt 但未传给 `AgentLoop.run`（回退默认值）—— 集成测试实测发现并修复，现在订阅偏好/历史去重真实进入 prompt。
+- 覆盖清单：path/bash sandbox、Registry、Loop、max_steps、dedup、Brief schema、API、tracing、run_agent 全链路均有自动化测试。全量 126 passed，`pytest` 一键可跑，Agent Loop 完全不依赖真实 LLM。

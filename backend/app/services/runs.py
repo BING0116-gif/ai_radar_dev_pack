@@ -105,7 +105,8 @@ def run_agent(
     # llm defaults to the real OpenAI-compatible client; tests inject mocks.
     llm = llm if llm is not None else OpenAICompatibleClient()
     result = AgentLoop(reg, llm, output_guard=guard, tracer=tracer).run(
-        AgentContext(task=_task_instruction(subscription), extra={"user_id": user_id})
+        AgentContext(task=_task_instruction(subscription), extra={"user_id": user_id}),
+        system_prompt=system_prompt,
     )
 
     summary = {
