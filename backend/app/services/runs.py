@@ -33,6 +33,11 @@ logger = logging.getLogger("app.services.runs")
 SUCCESS_STOP_REASONS = {"final_response", "repaired"}
 
 
+def get_default_llm() -> LLMClient:
+    """LLM used by API/scheduler runs; tests monkeypatch this factory."""
+    return OpenAICompatibleClient()
+
+
 def build_default_registry(root: Path | None = None) -> ToolRegistry:
     """The standard tool set for one agent run."""
     registry = ToolRegistry()

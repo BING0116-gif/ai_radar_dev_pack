@@ -13,6 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.api.runs import router as runs_router
 from app.api.subscriptions import router as subscriptions_router
 from app.core.config import get_settings
 from app.core.logging import get_logger, setup_logging
@@ -58,6 +59,7 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
 
 
 app.include_router(subscriptions_router)
+app.include_router(runs_router)
 
 
 @app.get("/health")

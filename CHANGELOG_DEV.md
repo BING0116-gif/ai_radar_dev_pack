@@ -123,3 +123,13 @@
 - `main.py` 增加 lifespan：仅当 `SCHEDULER_ENABLED=true`（且未设 `DISABLE_SCHEDULER`）启动，测试环境默认不受影响。
 - Settings 新增 `SCHEDULER_*` 与 `EMAIL_*` 字段，`.env.example` 同步；依赖新增 `apscheduler`。
 - 测试：`test_runs.py` 4 个用例（成功持久化+通知、通知失败不丢简报、未知 channel 保简报、近 7 天标题）+ `test_notify.py` 4 个用例 + `test_scheduler.py` 3 个用例（配置构建+手工触发、重启重建、start/shutdown）。全量 115 passed。
+
+### CARD-015 — Run / Brief / Trace REST API
+
+- 新增 `app/api/runs.py`：`POST /api/runs`（立即运行，走 `run_agent`）、`GET /api/runs`、`GET /api/runs/{id}`、`GET /api/runs/{id}/steps`、`GET /api/briefs`、`GET /api/briefs/{id}`。
+- 新增 `app/schemas/run.py`：`RunSummary/StepResponse/RunCreated/BriefSummary/BriefDetail`（`from_attributes`，`tool_input` 经 `AliasChoices` 映射 `tool_input_json`）。
+- 只暴露既有能力：POST 仅调用 `run_agent`（`llm` 经新增 `runs.get_default_llm()` 工厂可注入/测试替换），其余全为只读查询。
+- 统一结构：成功 `{code:0,...}`；run/brief 不存在 → `ApiError` 统一 404 信封（`40401`/`40402`）。
+- 敏感输出防护：steps 只返回截断 preview（≤500 字符，测试含 900 字符 snippet 断言）。
+- `.gitignore` 增加 `workspace/briefs/`（生成产物）。
+- 测试：`tests/test_run_api.py` 5 个用例（POST→读 run/brief/steps 全链路、run/brief 统一 404、输出不暴露、空列表统一信封；llm 与 workspace 均注入，不触真实 LLM/网络）。全量 120 passed。Gate D 达成（前后端可联通）。
