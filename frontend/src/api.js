@@ -37,8 +37,16 @@ export function getRuns() {
   return request('/api/runs')
 }
 
+export function getRunSteps(runId) {
+  return request(`/api/runs/${runId}/steps`)
+}
+
 export function getBriefs() {
   return request('/api/briefs')
+}
+
+export function getBrief(briefId) {
+  return request(`/api/briefs/${briefId}`)
 }
 
 export function createRun() {

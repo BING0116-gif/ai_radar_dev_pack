@@ -1,7 +1,9 @@
 <script setup>
 import { ref } from 'vue'
 import Dashboard from './views/Dashboard.vue'
+import History from './views/History.vue'
 import Settings from './views/Settings.vue'
+import Trace from './views/Trace.vue'
 
 const activeTab = ref('dashboard')
 </script>
@@ -14,6 +16,12 @@ const activeTab = ref('dashboard')
         <button :class="{ active: activeTab === 'dashboard' }" @click="activeTab = 'dashboard'">
           Dashboard
         </button>
+        <button :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'">
+          历史简报
+        </button>
+        <button :class="{ active: activeTab === 'trace' }" @click="activeTab = 'trace'">
+          运行轨迹
+        </button>
         <button :class="{ active: activeTab === 'settings' }" @click="activeTab = 'settings'">
           设置
         </button>
@@ -21,6 +29,8 @@ const activeTab = ref('dashboard')
     </header>
     <main>
       <Dashboard v-if="activeTab === 'dashboard'" />
+      <History v-else-if="activeTab === 'history'" />
+      <Trace v-else-if="activeTab === 'trace'" />
       <Settings v-else />
     </main>
   </div>
@@ -198,5 +208,26 @@ textarea {
 
 textarea {
   resize: vertical;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover {
+  background: #faf8f4;
+}
+
+.selected {
+  background: #eef3ef;
+}
+
+.md {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
 }
 </style>

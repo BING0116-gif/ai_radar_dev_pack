@@ -142,3 +142,11 @@
 - `src/App.vue` 重写为顶栏 Tab 壳（Dashboard | 设置），无 router（不引入新依赖）；样式遵循偏好：暖米白底、墨色文字、松绿主色、圆角、无特效。
 - 后端小扩展：`SubscriptionUpdate.role`（可选）→ PUT 时更新 `user.role`；`test_subscription_api` 新增 role 持久化用例。
 - 验证：`npm run build` 通过（13 modules）；`npm run dev` 启动后首页 200；后端全量 121 passed。Gate D 完成（前端真实联通后端）。
+
+### CARD-017 — History & Trace UI
+
+- `src/views/History.vue`：简报列表（日期/标题/条数，行点击选中高亮）→ 详情（`GET /briefs/{id}`，markdown 以 `<pre>` **纯文本渲染**，杜绝注入）。
+- `src/views/Trace.vue`：run 选择胶囊（`#id · status`）→ 步骤表（`GET /runs/{id}/steps`）：step_no 顺序、事件类型彩色 chip（run_start/finish 灰、llm_turn 蓝、tool_call 琥珀、tool_result 绿、run_error 红）、工具名、输入/输出 preview（截断、等宽字体）、耗时 ms、成功/失败徽标明显区分。
+- `src/api.js` 新增 `getBrief(id)` / `getRunSteps(runId)`；`App.vue` 增「历史简报」「运行轨迹」两个 Tab。
+- 敏感防护：仅展示 API 已截断的 preview；无密钥相关字段；模型内容以纯文本渲染。
+- 验证：`npm run build` 通过；真实 API 驱动（无 mock）。
