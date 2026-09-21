@@ -11,11 +11,22 @@ services:
       APP_ENV: development
       DATABASE_URL: sqlite:////data/ai_radar.db
       WORKSPACE_ROOT: /data/workspace
-      SCHEDULER_ENABLED: "false"
+      # 每日自动生成默认开启（每天 SCHEDULER_DAILY_HOUR:MINUTE 自动生成并邮件推送）
+      SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-true}
+      SCHEDULER_DAILY_HOUR: ${SCHEDULER_DAILY_HOUR:-9}
+      SCHEDULER_DAILY_MINUTE: ${SCHEDULER_DAILY_MINUTE:-0}
       # LLM 凭据优先取 shell / 系统环境变量（不进 .env），缺失时回退到 .env 值
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-}
+      # 邮件推送凭据：留空=DEMO 模式（简报邮件写入 /data/workspace/emails/*.eml），
+      # 配齐=真实 SMTP 投递
+      EMAIL_HOST: ${EMAIL_HOST:-}
+      EMAIL_PORT: ${EMAIL_PORT:-465}
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_TO: ${EMAIL_TO:-}
     volumes:
       - ai_radar_data:/data
     restart: unless-stopped

@@ -224,3 +224,15 @@
 **验证**
 - 新增 `tests/test_reviews.py` 9 个用例：待审-通过-通知链、打回、缺审/重复审批 40402/42204、反馈 upsert/DELETE（含 URL key）、非法 verdict 42200、prompt 注入（recent_feedback 分组 + system prompt 含信号 + read 不进 prompt）。全量 **143 passed**；`npm run build` 通过。
 - Docker 全栈 + 真实 DeepSeek 实测：开启审批 → run #8 生成 5 条简报进入 pending → 审批通过变 published；重复审批 422/42204；反馈点赞-已读 upsert 单行、URL 含 `/` 的 key 删除成功。cleanup 测试数据、`require_approval` 已复位。
+
+## 2026-09-21
+
+### 邮件自动推送（默认渠道）+ 面试交付补强
+
+- **邮件推送默认启用且"可运行可验证"**：`EmailNotifier` 新增 subject 参数与 **DEMO 模式**——未配置 `EMAIL_*` 时不再抛错，而是把完整简报邮件（主题「AI 新闻简报 \<日期\>（N 条）」+ Markdown 全文）写入 `workspace/emails/ai-radar-<ts>.eml` 并打日志；配齐 `EMAIL_HOST/USER/PASSWORD/FROM/TO` 后同一流程走真实 SMTP。`build_default_notifiers` 恒含 email，无凭据环境也能证明"邮件推送存在且已发生"。
+- **`_notify` 携带完整简报**：推送正文从"已生成 N 条新闻"升级为 简报头部 + Markdown 全文 + 落款；`approve_brief`（HITL 审批通过）同样走此推送。
+- **默认渠道 email**：Subscription 模型/schema/API/Settings 页默认 `notification_channel=email`（原 none）；设置页说明"未配置将写入 workspace/emails 供查看"。channel 为空/None 的旧订阅回退 email。
+- **每日自动生成默认开启**：[docker-compose.yml](docker-compose.yml) 的 `SCHEDULER_ENABLED` 由写死 `false` 改为 `${SCHEDULER_ENABLED:-true}`（并透传 `SCHEDULER_DAILY_*`）——面试官 `docker compose up` 即见每天 09:00 自动生成并推送。`.env.example` 同步 `SCHEDULER_ENABLED=true` + EMAIL 注释。
+- **README**：Quick Start 新增「每日自动生成 + 邮件推送（默认开启）」小节，含 DEMO 模式说明与立即验证命令（`docker compose exec backend ls /data/workspace/emails/`）；环境变量表更新。
+- **测试隔离**：默认通知走 email DEMO 落盘会写仓库 workspace，测试 fixture 统一将 `notify.get_settings` 打桩到临时目录；`workspace/emails/` 加入 `.gitignore`（运行时产物）。
+- **验证**：新增 3 组用例（email 未配置落 .eml 且含主题/正文、build_default_notifiers 恒含 email、run_agent 邮件 DEMO 推送携带完整简报）。全量 **145 passed**；`npm run build` 通过；`docker compose config` 语法校验通过（本机 Docker 未启动，未做容器级冒烟）。

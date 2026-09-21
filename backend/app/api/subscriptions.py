@@ -35,7 +35,7 @@ def _to_response(user: User, sub: Subscription | None) -> SubscriptionResponse:
         keywords=sub.keywords_json if sub else [],
         excluded_keywords=sub.excluded_keywords_json if sub else [],
         language=sub.language if sub else "zh-CN",
-        notification_channel=sub.notification_channel if sub else "none",
+        notification_channel=sub.notification_channel if sub else "email",
         enabled=sub.enabled if sub else True,
         require_approval=sub.require_approval if sub else False,
     )

@@ -22,7 +22,7 @@ class Subscription(Base):
 
     max_items: Mapped[int] = mapped_column(Integer, default=5)
     language: Mapped[str] = mapped_column(String(16), default="zh")
-    notification_channel: Mapped[str] = mapped_column(String(32), default="none")
+    notification_channel: Mapped[str] = mapped_column(String(32), default="email")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     # true = 生成简报先进入"待审"，人工通过后才发布+通知（HITL）
     require_approval: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("0"))

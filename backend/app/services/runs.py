@@ -178,25 +178,44 @@ def run_agent(
             summary["brief_status"] = "published"
             summary["notification_sent"] = _notify(
                 (notifiers if notifiers is not None else build_default_notifiers()),
-                subscription, max_items, brief.item_count,
+                subscription, brief,
             )
     elif result.stop_reason not in SUCCESS_STOP_REASONS:
         summary["error"] = f"run ended with {result.stop_reason}"
     return summary
 
 
-def _notify(notifiers: dict[str, Notifier], subscription, max_items: int, item_count: int) -> bool:
-    channel = (subscription.notification_channel if subscription else "console") or "console"
+def _notify(notifiers: dict[str, Notifier], subscription, brief: Brief) -> bool:
+    """Push the finished brief to the subscription's channel (email by default).
+
+    Message 携带完整简报：邮件主题为"AI 新闻简报 <日期>（N 条）"，正文为
+    Markdown 全文。Email 未配置 EMAIL_* 时由 EmailNotifier 以 DEMO 模式落
+    盘 .eml（不失败、不丢简报）。
+    """
+    channel = (subscription.notification_channel if subscription else "email") or "email"
     notifier = notifiers.get(channel)
     if notifier is None:
         logger.warning("notification channel '%s' not available; brief already saved", channel)
         return False
+    subject = f"AI 新闻简报 {brief.brief_date}（{brief.item_count} 条）"
     try:
-        notifier.send(f"简报已生成：{item_count} 条新闻（上限 {max_items} 条）。")
+        notifier.send(_notification_body(brief), subject=subject)
         return True
     except Exception as exc:  # notification is best-effort; never lose the brief
         logger.warning("notification failed (brief kept): %s", exc)
         return False
+
+
+def _notification_body(brief: Brief) -> str:
+    """Compose the pushed message: a short header followed by the full brief."""
+    lines = [
+        f"AI 新闻简报 {brief.brief_date}：共 {brief.item_count} 条",
+        "",
+        brief.content_markdown,
+        "",
+        "— 由 AI Radar Agent 自动生成并推送",
+    ]
+    return "\n".join(lines)
 
 
 def _task_instruction(subscription) -> str:
@@ -252,6 +271,6 @@ def approve_brief(db: Session, brief_id: int, *, notifiers: dict[str, Notifier] 
     )
     _notify(
         notifiers if notifiers is not None else build_default_notifiers(),
-        subscription, subscription.max_items if subscription else 5, brief.item_count,
+        subscription, brief,
     )
     return brief

@@ -1,9 +1,7 @@
-"""Tests for the send_notification tool (CARD-014)."""
-
-import pytest
+"""Tests for the send_notification tool (CARD-014) and the email push (default)."""
 
 from app.agent.registry import ToolRegistry
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.tools.notify import (
     ConsoleNotifier,
     EmailNotifier,
@@ -29,12 +27,27 @@ def test_unknown_channel_structured_failure():
     assert "not available" in (result.error or "")
 
 
-def test_email_notifier_requires_configuration():
-    settings = get_settings()
+def test_email_unconfigured_writes_demo_email(tmp_path):
+    """无 EMAIL_* 时邮件走 DEMO：完整邮件落盘 .eml，而不是抛错。"""
+    settings = Settings(_env_file=None).model_copy(update={"WORKSPACE_ROOT": tmp_path})
     notifier = EmailNotifier(settings)
     assert notifier.is_configured() is False
-    with pytest.raises(NotifyError):
-        notifier.send("x")
+
+    notifier.send("brief markdown 正文", subject="AI 新闻简报 2026-09-21（5 条）")
+
+    files = list((tmp_path / "emails").glob("*.eml"))
+    assert len(files) == 1
+    content = files[0].read_text(encoding="utf-8")
+    assert "Subject: AI 新闻简报 2026-09-21（5 条）" in content
+    assert "brief markdown 正文" in content
+
+
+def test_email_default_notifiers_include_email(tmp_path):
+    """build_default_notifiers 恒含 email —— 邮件推送默认可用、可运行。"""
+    from app.tools.notify import build_default_notifiers
+
+    notifiers = build_default_notifiers()
+    assert set(notifiers) == {"console", "email"}
 
 
 def test_email_credentials_stay_secret(monkeypatch):

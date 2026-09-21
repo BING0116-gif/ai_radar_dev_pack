@@ -54,11 +54,15 @@ def tmp_settings(tmp_path):
 
 @pytest.fixture
 def patched_run_env(monkeypatch, tmp_settings):
+    from app.tools import notify as notify_module
+
     reg = ToolRegistry()
     register_web_search_tool(reg, providers=[FixedProvider()])
     monkeypatch.setattr(runs_service, "build_default_registry", lambda root=None: reg)
     monkeypatch.setattr(runs_service, "get_settings", lambda: tmp_settings)
     monkeypatch.setattr(briefs_service, "get_settings", lambda: tmp_settings)
+    # 默认通知走 email DEMO 落盘，须与单元测试隔离（否则把 .eml 写进仓库 workspace）
+    monkeypatch.setattr(notify_module, "get_settings", lambda: tmp_settings)
 
 
 def test_post_run_then_read_run_brief_and_steps(client, api_llm, patched_run_env):

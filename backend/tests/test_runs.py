@@ -91,11 +91,30 @@ def test_notification_failure_does_not_lose_brief(db_session, tmp_path):
 def test_run_agent_unsupported_channel_keeps_brief(db_session, tmp_path):
     user = _user_with_subscription(db_session, notification_channel="email")
     llm = ScriptedLLM(LLMResponse(content=BRIEF_JSON))
-    # email is not configured -> channel unavailable, but brief must be saved
+    # notifiers 里没有 email -> 渠道不可用，但简报必须保存
     summary = run_agent(db_session, user.id, llm=llm, registry=_registry(tmp_path),
                         notifiers={"console": ConsoleNotifier()}, root=tmp_path)
     assert summary["brief_id"] is not None
     assert summary["notification_sent"] is False
+
+
+def test_run_agent_email_demo_pushes_full_brief(db_session, tmp_path):
+    """默认邮件推送：无 SMTP 也"发出"（.eml 落盘）且携带完整简报。"""
+    from app.core.config import Settings
+    from app.tools.notify import EmailNotifier
+
+    user = _user_with_subscription(db_session, notification_channel="email")
+    llm = ScriptedLLM(LLMResponse(content=BRIEF_JSON))
+    settings = Settings(_env_file=None).model_copy(update={"WORKSPACE_ROOT": tmp_path})
+    summary = run_agent(db_session, user.id, llm=llm, registry=_registry(tmp_path),
+                        notifiers={"email": EmailNotifier(settings)}, root=tmp_path)
+
+    assert summary["notification_sent"] is True
+    emails = list((tmp_path / "emails").glob("*.eml"))
+    assert len(emails) == 1
+    content = emails[0].read_text(encoding="utf-8")
+    assert "Subject: AI 新闻简报 2026-09-18（1 条）" in content
+    assert "story" in content  # 简报正文随邮件推送
 
 
 def test_recent_titles_from_briefs(db_session):

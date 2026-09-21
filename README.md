@@ -65,6 +65,15 @@ docker compose up --build
 
 > 默认 SQLite 与 workspace 落在命名卷 `ai_radar_data`：删卷 `docker compose down -v` 可重置演示数据。
 
+### 每日自动生成 + 邮件推送（默认开启）
+
+- Docker 下 `SCHEDULER_ENABLED` 默认 `true`：每天 09:00 自动运行 Agent，生成简报并入库存档。
+- 推送渠道默认 **Email**（可在「设置」页切换 console / 关闭）。
+- 未配置 `EMAIL_*` 时进入 **DEMO 模式**：每次简报生成会把完整邮件（主题 + Markdown 正文）写入 `workspace/emails/ai-radar-<时间戳>.eml`，并在后端日志打印路径与提醒 —— 无 SMTP 凭据也能看到"邮件自动推送已发生"。
+- 配齐 `EMAIL_HOST / EMAIL_USER / EMAIL_PASSWORD / EMAIL_FROM / EMAIL_TO` 后，同一流程改为真实 SMTP 投递。
+
+立即验证（不必等到 09:00）：DashBoard 点「立即生成」，然后 `docker compose exec backend ls -la /data/workspace/emails/` 查看本邮件。
+
 ## 本地开发 Quick Start
 
 ```bash
@@ -93,9 +102,9 @@ Linux/macOS 将 `.venv\Scripts\` 换为 `.venv/bin/`。
 | `WORKSPACE_ROOT` | workspace | 沙箱根目录（自动解析绝对路径） |
 | `AGENT_MAX_STEPS` | 12 | Loop 步数上限 |
 | `TOOL_TIMEOUT_SECONDS` | 10 | 工具默认超时 |
-| `SCHEDULER_ENABLED` | false | 是否启动每日调度（重启按配置重建） |
+| `SCHEDULER_ENABLED` | true（Docker）/ false（本地） | 是否启动每日调度（重启按配置重建） |
 | `SCHEDULER_DAILY_HOUR` / `MINUTE` | 9 / 0 | 每日触发时间 |
-| `EMAIL_*` | 空 | 邮件通知（可选；配置齐全才启用） |
+| `EMAIL_HOST` `EMAIL_USER` `EMAIL_PASSWORD` `EMAIL_FROM` `EMAIL_TO` | 空 | 全部留空=DEMO（邮件写 `workspace/emails/*.eml`）；配齐=真实 SMTP 投递 |
 
 注意：`.env` 已被 `.gitignore` 排除；`LLM_API_KEY`/`EMAIL_PASSWORD` 亦可直接设到系统环境变量（推荐）。
 

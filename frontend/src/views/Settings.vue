@@ -12,7 +12,7 @@ const form = ref({
   max_items: 5,
   language: 'zh-CN',
   timezone: 'Asia/Shanghai',
-  notification_channel: 'none',
+  notification_channel: 'email',
   require_approval: false,
 })
 const topicsText = ref('')
@@ -40,7 +40,7 @@ async function load() {
       max_items: data.max_items,
       language: data.language || 'zh-CN',
       timezone: data.timezone || 'Asia/Shanghai',
-      notification_channel: data.notification_channel || 'none',
+      notification_channel: data.notification_channel || 'email',
       require_approval: data.require_approval || false,
     }
     topicsText.value = fromList(data.topics)
@@ -124,11 +124,11 @@ onMounted(load)
           </label>
 
           <label class="field">
-            <span>通知渠道</span>
+            <span>推送渠道</span>
             <select v-model="form.notification_channel">
-              <option value="none">不通知</option>
+              <option value="email">Email（默认；未配置将写入 workspace/emails 供查看）</option>
               <option value="console">Console</option>
-              <option value="email">Email（需配置）</option>
+              <option value="none">不推送</option>
             </select>
           </label>
 

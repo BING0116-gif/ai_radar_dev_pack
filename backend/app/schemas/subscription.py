@@ -25,7 +25,7 @@ class SubscriptionUpdate(BaseModel):
     keywords: list[str] = Field(default_factory=list)
     excluded_keywords: list[str] = Field(default_factory=list)
     language: str = "zh-CN"
-    notification_channel: str = "none"
+    notification_channel: str = "email"
     enabled: bool = True
     require_approval: bool = False
     timezone: str = "Asia/Shanghai"
@@ -52,6 +52,6 @@ class SubscriptionResponse(BaseModel):
     keywords: list[Any]
     excluded_keywords: list[Any]
     language: str
-    notification_channel: str
+    notification_channel: str = "email"
     enabled: bool
     require_approval: bool = False
