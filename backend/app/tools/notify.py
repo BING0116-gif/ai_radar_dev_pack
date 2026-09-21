@@ -1,13 +1,14 @@
 """Notification: Console (required) + Email (default).
 
-Credentials come exclusively from central Settings / environment variables —
-never from the database. A notification failure never destroys the brief the
-agent already generated; callers treat notification as best-effort.
+Credentials come exclusively from central Settings / environment variables or
+the UI-saved local file (see ``app.services.email_settings``) — never from the
+database. A notification failure never destroys the brief the agent already
+generated; callers treat notification as best-effort.
 
-Email 默认启用：未配置 ``EMAIL_*``（面试官/无 SMTP 环境）时进入 **DEMO 模式**
-—— 把完整的简报邮件作为 ``.eml`` 文件写入 ``workspace/emails/`` 并打日志，
-证明"邮件自动推送"存在且可运行；配置 ``EMAIL_*`` 后同一份邮件真实通过 SMTP
-投递。
+Email 默认启用：未配置 SMTP（面试官/无凭据环境）时进入 **DEMO 模式** —— 把
+完整的简报邮件作为 ``.eml`` 文件写入 ``workspace/emails/`` 并打日志，证明
+"邮件自动推送"存在且可运行；在设置页填好 SMTP 或配好 ``EMAIL_*`` 后，
+同一份邮件真实通过 SMTP 投递。
 """
 
 import logging
@@ -21,6 +22,7 @@ from pydantic import BaseModel, Field, SecretStr
 
 from app.agent.registry import ToolDefinition, ToolRegistry
 from app.core.config import get_settings
+from app.services.email_settings import is_fully_configured, load_email_config
 
 logger = logging.getLogger("app.tools.notify")
 
@@ -50,43 +52,46 @@ class ConsoleNotifier(Notifier):
 
 
 class EmailNotifier(Notifier):
-    """SMTP delivery when EMAIL_* is configured; otherwise DEMO mode.
+    """SMTP delivery when configured; otherwise DEMO mode.
 
-    DEMO 模式（无凭据也可运行）：把完整邮件按 RFC 822 主体结构写到
-    ``<WORKSPACE_ROOT>/emails/ai-radar-<ts>.eml``，让接收方/面试官在没有
-    SMTP 的环境里也能看到"推送了什么、长什么样"。
+    Configuration source = env ``EMAIL_*`` defaults merged with the UI-saved
+    local file (app.services.email_settings). DEMO 模式（无 SMTP 配置）把完整
+    邮件按 RFC 822 主体结构写到 ``<WORKSPACE_ROOT>/emails/ai-radar-<ts>.eml``。
     """
 
     channel = "email"
 
-    def __init__(self, settings=None):
+    def __init__(self, settings=None, config: dict | None = None):
         self.settings = settings or get_settings()
+        self._config = (
+            config if config is not None else load_email_config(self.settings.WORKSPACE_ROOT)
+        )
 
     def is_configured(self) -> bool:
-        s = self.settings
-        return bool(s.EMAIL_HOST and s.EMAIL_USER and s.EMAIL_PASSWORD.get_secret_value() and s.EMAIL_FROM and s.EMAIL_TO)
+        return is_fully_configured(self._config)
 
     def send(self, message: str, subject: str | None = None) -> None:
         subject = subject or "AI Radar 简报"
         if not self.is_configured():
             self._demo_save(message, subject)
             return
-        settings = self.settings
+        cfg = self._config
         msg = EmailMessage()
         msg["Subject"] = subject
-        msg["From"] = settings.EMAIL_FROM
-        msg["To"] = settings.EMAIL_TO
+        msg["From"] = cfg["from"]
+        msg["To"] = cfg["to"]
         msg.set_content(message)
         context = ssl.create_default_context()
         try:
-            if settings.EMAIL_PORT == 465:
-                with smtplib.SMTP_SSL(settings.EMAIL_HOST, settings.EMAIL_PORT, context=context, timeout=20) as smtp:
-                    smtp.login(settings.EMAIL_USER, settings.EMAIL_PASSWORD.get_secret_value())
+            port = int(cfg.get("port") or 465)
+            if port == 465:
+                with smtplib.SMTP_SSL(str(cfg["host"]), port, context=context, timeout=20) as smtp:
+                    smtp.login(str(cfg["user"]), str(cfg.get("password") or ""))
                     smtp.send_message(msg)
             else:
-                with smtplib.SMTP(settings.EMAIL_HOST, settings.EMAIL_PORT, timeout=20) as smtp:
+                with smtplib.SMTP(str(cfg["host"]), port, timeout=20) as smtp:
                     smtp.starttls(context=context)
-                    smtp.login(settings.EMAIL_USER, settings.EMAIL_PASSWORD.get_secret_value())
+                    smtp.login(str(cfg["user"]), str(cfg.get("password") or ""))
                     smtp.send_message(msg)
         except (smtplib.SMTPException, OSError) as exc:
             raise NotifyError(f"email send failed: {exc}") from exc

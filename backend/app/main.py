@@ -13,6 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.api.email_config import router as email_config_router
 from app.api.feedback import router as feedback_router
 from app.api.reviews import router as reviews_router
 from app.api.runs import router as runs_router
@@ -76,6 +77,7 @@ app.include_router(subscriptions_router)
 app.include_router(runs_router)
 app.include_router(reviews_router)
 app.include_router(feedback_router)
+app.include_router(email_config_router)
 
 
 @app.get("/health")

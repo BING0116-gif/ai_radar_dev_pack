@@ -69,10 +69,11 @@ docker compose up --build
 
 - Docker 下 `SCHEDULER_ENABLED` 默认 `true`：每天 09:00 自动运行 Agent，生成简报并入库存档。
 - 推送渠道默认 **Email**（可在「设置」页切换 console / 关闭）。
-- 未配置 `EMAIL_*` 时进入 **DEMO 模式**：每次简报生成会把完整邮件（主题 + Markdown 正文）写入 `workspace/emails/ai-radar-<时间戳>.eml`，并在后端日志打印路径与提醒 —— 无 SMTP 凭据也能看到"邮件自动推送已发生"。
-- 配齐 `EMAIL_HOST / EMAIL_USER / EMAIL_PASSWORD / EMAIL_FROM / EMAIL_TO` 后，同一流程改为真实 SMTP 投递。
+- **UI 配置（推荐 Demo 用）**：设置页「邮件推送配置」卡片填写 SMTP（host/端口/账号/授权码/发件人/收件人），点「保存配置」立即生效，点「发送测试邮件」立刻验证能收到信。凭据写入容器数据卷的本地文件 `workspace/email_settings.json`（已 gitignore，**不入库、不入 git**），重启保留。
+- **未配置 SMTP 时进入 DEMO 模式**：每次简报生成会把完整邮件（主题 + Markdown 正文）写入 `workspace/emails/ai-radar-<时间戳>.eml`，并在后端日志打印路径与提醒 —— 无 SMTP 凭据也能看到"邮件自动推送已发生"。
+- **生产路径**：配齐环境变量 `EMAIL_HOST / EMAIL_USER / EMAIL_PASSWORD / EMAIL_FROM / EMAIL_TO`（优先于文件），同一流程走真实 SMTP 投递。
 
-立即验证（不必等到 09:00）：DashBoard 点「立即生成」，然后 `docker compose exec backend ls -la /data/workspace/emails/` 查看本邮件。
+立即验证（不必等到 09:00）：设置页「发送测试邮件」，或 DashBoard 点「立即生成」后 `docker compose exec backend ls /data/workspace/emails/` 查看演示邮件。
 
 ## 本地开发 Quick Start
 

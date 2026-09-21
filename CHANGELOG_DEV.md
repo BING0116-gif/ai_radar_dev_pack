@@ -236,3 +236,11 @@
 - **README**：Quick Start 新增「每日自动生成 + 邮件推送（默认开启）」小节，含 DEMO 模式说明与立即验证命令（`docker compose exec backend ls /data/workspace/emails/`）；环境变量表更新。
 - **测试隔离**：默认通知走 email DEMO 落盘会写仓库 workspace，测试 fixture 统一将 `notify.get_settings` 打桩到临时目录；`workspace/emails/` 加入 `.gitignore`（运行时产物）。
 - **验证**：新增 3 组用例（email 未配置落 .eml 且含主题/正文、build_default_notifiers 恒含 email、run_agent 邮件 DEMO 推送携带完整简报）。全量 **145 passed**；`npm run build` 通过；`docker compose config` 语法校验通过（本机 Docker 未启动，未做容器级冒烟）。
+
+### 邮件配置中心 — 设置页可配置 SMTP 并一键测试发送
+
+- **UI 可配**：设置页新增「邮件推送配置」卡片 —— SMTP host/端口/账号/授权码/发件人/收件人，保存即生效，另有「发送测试邮件」按钮即时验证收得到信（填了就直接过 SMTP 投递；没填则落 DEMO .eml 并提示）。
+- **密钥安全**：凭据写入 `workspace/email_settings.json`（已 gitignore 的本地文件，容器落在数据卷重启保留），**不入库、不入 git、GET 不回显**；`EMAIL_*` 环境变量仍为生产路径（环境变量作默认值、UI 文件覆盖）。
+- 后端：`app/services/email_settings.py`（env+文件合并加载/保存/脱敏）、`GET/PUT /api/email-config`、`POST /api/email-config/test`（SMTP 失败 → 统一 502/50202）；`EmailNotifier` 配置源改为 email_settings（含文件），DEMO 模式保留。
+- 前端：`Settings.vue` 邮件配置卡片 + 配置状态徽标（已配置·真实 SMTP / 演示模式）；`api.js` 三个新接口；`btn-soft/btn-sm` 提升为全局样式。
+- 验证：新增 `tests/test_email_config.py` 7 个用例（env 空白未配置、保存-重载回环、文件覆盖 env、DEMO 落盘、notifier 读已存配置、API GET/PUT 不回显密码、未配置测试邮件返回 demo）。全量 **152 passed**；`npm run build` 通过；`docker compose config` 通过。

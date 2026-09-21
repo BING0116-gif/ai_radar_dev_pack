@@ -23,6 +23,7 @@ frontend/dist/
 workspace/cache/
 workspace/briefs/
 workspace/emails/
+workspace/email_settings.json
 *.log
 
 # --- Databases ---

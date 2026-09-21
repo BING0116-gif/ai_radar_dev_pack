@@ -79,3 +79,16 @@ export function deleteFeedback(itemKey) {
   // item_key 可能是含 / 的来源 URL，必须走 query 参数（路径段会截断）
   return request(`/api/feedback?item_key=${encodeURIComponent(itemKey)}`, { method: 'DELETE' })
 }
+
+// 邮件推送 SMTP 配置（设置页）
+export function getEmailConfig() {
+  return request('/api/email-config')
+}
+
+export function saveEmailConfig(payload) {
+  return request('/api/email-config', { method: 'PUT', body: JSON.stringify(payload) })
+}
+
+export function testEmailConfig(payload) {
+  return request('/api/email-config/test', { method: 'POST', body: JSON.stringify(payload) })
+}

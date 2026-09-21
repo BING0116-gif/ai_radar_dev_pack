@@ -408,22 +408,6 @@ onMounted(refresh)
   gap: 8px;
 }
 
-.btn-sm {
-  padding: 5px 12px;
-  font-size: 13px;
-}
-
-.btn-soft {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--ink);
-}
-
-.btn-soft:hover {
-  border-color: var(--pine);
-  color: var(--pine);
-}
-
 .chip.warn {
   background: #f5eedd;
   color: #8a6d1a;

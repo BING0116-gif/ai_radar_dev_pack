@@ -183,6 +183,22 @@ h2 {
   cursor: not-allowed;
 }
 
+.btn-sm {
+  padding: 5px 12px;
+  font-size: 13px;
+}
+
+.btn-soft {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--ink);
+}
+
+.btn-soft:hover:not(:disabled) {
+  border-color: var(--pine);
+  color: var(--pine);
+}
+
 .error {
   background: #fdf0ef;
   color: var(--danger);
