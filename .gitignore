@@ -24,6 +24,7 @@ workspace/cache/
 workspace/briefs/
 workspace/emails/
 workspace/email_settings.json
+workspace/briefing.json
 *.log
 
 # --- Databases ---

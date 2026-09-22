@@ -18,8 +18,11 @@ def test_workspace_root_resolves_to_absolute():
     assert settings.WORKSPACE_ROOT == (BASE_DIR / "workspace").resolve()
 
 
-def test_dev_env_starts_without_optional_keys():
+def test_dev_env_starts_without_optional_keys(monkeypatch):
     # No LLM_* values provided -> defaults are used, construction must not raise.
+    # delenv first: host env vars (e.g. LLM_MODEL=deepseek-chat) must not leak in.
+    for key in ("LLM_MODEL", "LLM_BASE_URL", "LLM_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
     settings = Settings(_env_file=None)
     assert settings.LLM_MODEL == ""
     assert settings.LLM_BASE_URL == ""
